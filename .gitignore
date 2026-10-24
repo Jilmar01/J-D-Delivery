@@ -1,0 +1,19 @@
+# Ignorar node_modules en la raíz y en cualquier subcarpeta
+node_modules/
+**/node_modules/
+
+# Ignorar variables de entorno en cualquier subcarpeta
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Permitir plantillas de ejemplo
+!.env.example
+!**/.env.example
+
+# Archivos de registro y sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
