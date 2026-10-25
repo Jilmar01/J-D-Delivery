@@ -1,35 +1,75 @@
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../config/database.js";
 
 const router = Router();
 
 // POST /api/pedidos
-router.post("/", (req, res) => {
-  res.status(501).json({
-    message: "Creación de pedidos pendiente de implementación",
-  });
-});
+router.post("/", async (req, res) => {
+  try {
+    const { clienteId, descripcion, total } = req.body;
 
-// GET /api/pedidos
-router.get("/", (req, res) => {
-  res.status(501).json({
-    message: "Listado de pedidos pendiente de implementación",
-  });
-});
+    // Validar datos obligatorios
+    if (
+      typeof clienteId !== "string" ||
+      !clienteId.trim() ||
+      total === undefined ||
+      total === null ||
+      total === ""
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "clienteId y total son obligatorios",
+      });
+    }
 
-// GET /api/pedidos/:id
-router.get("/:id", (req, res) => {
-  res.status(501).json({
-    message: "Consulta de pedido pendiente de implementación",
-    id: req.params.id,
-  });
-});
+    // Validar el total
+    const totalNumero = Number(total);
 
-// PATCH /api/pedidos/:id/estado
-router.patch("/:id/estado", (req, res) => {
-  res.status(501).json({
-    message: "Actualización del estado pendiente de implementación",
-    id: req.params.id,
-  });
+    if (
+      !Number.isFinite(totalNumero) ||
+      totalNumero <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "El total debe ser un número mayor que cero",
+      });
+    }
+
+    // Validar la descripción
+    if (
+      descripcion !== undefined &&
+      descripcion !== null &&
+      typeof descripcion !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "La descripción debe ser un texto",
+      });
+    }
+
+    // Crear el pedido en PostgreSQL mediante Prisma
+    const pedido = await prisma.pedido.create({
+      data: {
+        clienteId: clienteId.trim(),
+        descripcion: descripcion?.trim() || null,
+        total: new Prisma.Decimal(totalNumero.toFixed(2)),
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Pedido creado correctamente",
+      data: pedido,
+    });
+  } catch (error) {
+    console.error("Error al crear el pedido:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno al crear el pedido",
+    });
+  }
 });
 
 export default router;
