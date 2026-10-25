@@ -34,5 +34,9 @@ export async function iniciarSesion(correo, contrasena) {
     )
   }
 
-  return usuario
+  return {
+    ...usuario,
+    rol: String(usuario.rol).toUpperCase(),
+    token: datos.token,
+  }
 }

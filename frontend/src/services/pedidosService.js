@@ -28,4 +28,16 @@ export async function crearPedido(datosPedido) {
   return nuevoPedido
 }
 
+export async function actualizarEstadoPedido(id, estado) {
+  const pedido = pedidosSimulados.find((p) => p.id === id)
+
+  if (!pedido) {
+    throw new Error('Pedido no encontrado.')
+  }
+
+  pedido.estado = estado
+
+  return { ...pedido }
+}
+
 export { API_URL }
