@@ -1,0 +1,51 @@
+
+import { useState } from 'react'
+import Login from './Login'
+import EncabezadoApp from './components/EncabezadoApp'
+import PortalCliente from './components/PortalCliente'
+import PanelRepartidor from './components/PanelRepartidor'
+
+function VistaPorRol({ usuario }) {
+  switch (usuario.rol) {
+    case 'CLIENTE':
+      return <PortalCliente usuario={usuario} />
+    case 'REPARTIDOR':
+      return <PanelRepartidor usuario={usuario} />
+    default:
+      return (
+        <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+          <p
+            role="alert"
+            className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400"
+          >
+            Tu rol ({usuario.rol}) no tiene una vista disponible.
+          </p>
+        </main>
+      )
+  }
+}
+
+function App() {
+  const [usuario, setUsuario] = useState(null)
+
+  if (!usuario) {
+    return <Login alIniciarSesion={setUsuario} />
+  }
+
+  return (
+    <div className="min-h-screen bg-[#09090B] text-zinc-100">
+      <EncabezadoApp
+        usuario={usuario}
+        alCerrarSesion={() => setUsuario(null)}
+      />
+
+      <VistaPorRol usuario={usuario} />
+
+      <footer className="border-t border-white/10 px-5 py-6 text-center text-xs text-zinc-500">
+        © {new Date().getFullYear()} J-D Delivery · Sistema distribuido de gestión de pedidos y entregas
+      </footer>
+    </div>
+  )
+}
+
+export default App
