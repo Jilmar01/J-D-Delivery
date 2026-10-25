@@ -2,6 +2,35 @@
 const AUTH_API_URL =
   import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3003'
 
+export async function registrarUsuario({ nombre, correo, contrasena, rol }) {
+  if (!nombre || !correo || !contrasena || !rol) {
+    throw new Error('Completa todos los campos.')
+  }
+
+  const respuesta = await fetch(`${AUTH_API_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      nombre,
+      correo,
+      password: contrasena,
+      rol,
+    }),
+  })
+
+  const datos = await respuesta.json().catch(() => ({}))
+
+  if (!respuesta.ok) {
+    throw new Error(
+      datos.message || 'No se pudo crear la cuenta. Verifica tus datos.'
+    )
+  }
+
+  return datos
+}
+
 export async function iniciarSesion(correo, contrasena) {
   if (!correo || !contrasena) {
     throw new Error('Ingresa tu correo y contraseña.')

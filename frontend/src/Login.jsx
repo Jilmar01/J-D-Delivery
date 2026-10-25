@@ -1,8 +1,12 @@
 
 import { useState } from 'react'
 import { iniciarSesion as autenticarUsuario } from './services/authService'
+import CampoFormulario from './components/CampoFormulario'
+import FormularioRegistro from './components/FormularioRegistro'
 
 function Login({ alIniciarSesion }) {
+  const [modo, setModo] = useState('login')
+  const [aviso, setAviso] = useState('')
   const [correo, setCorreo] = useState('')
   const [contrasena, setContrasena] = useState('')
   const [error, setError] = useState('')
@@ -25,6 +29,22 @@ function Login({ alIniciarSesion }) {
     } finally {
       setCargando(false)
     }
+  }
+
+  const esRegistro = modo === 'registro'
+
+  function cambiarModo(nuevoModo) {
+    setModo(nuevoModo)
+    setError('')
+    setAviso('')
+  }
+
+  function alRegistrar(correoRegistrado) {
+    setCorreo(correoRegistrado)
+    setContrasena('')
+    setModo('login')
+    setError('')
+    setAviso('Cuenta creada correctamente. Ahora inicia sesión.')
   }
 
   return (
@@ -63,68 +83,80 @@ function Login({ alIniciarSesion }) {
         </div>
 
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-white">Bienvenido</h2>
+          <h2 className="text-xl font-semibold text-white">
+            {esRegistro ? 'Crea tu cuenta' : 'Bienvenido'}
+          </h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Ingresa tus datos para continuar.
+            {esRegistro
+              ? 'Completa tus datos para registrarte.'
+              : 'Ingresa tus datos para continuar.'}
           </p>
         </div>
 
-        <form onSubmit={iniciarSesion} className="space-y-5">
-          <div>
-            <label
-              htmlFor="correo"
-              className="mb-2 block text-sm font-medium text-zinc-200"
-            >
-              Correo electrónico
-            </label>
-            <input
+        {esRegistro ? (
+          <FormularioRegistro alRegistrar={alRegistrar} />
+        ) : (
+          <form onSubmit={iniciarSesion} className="space-y-5">
+            <CampoFormulario
               id="correo"
+              etiqueta="Correo electrónico"
               type="email"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
               placeholder="cliente@ejemplo.com"
               autoComplete="username"
               required
-              className="w-full rounded-xl border border-zinc-700 bg-[#09090B] px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
             />
-          </div>
 
-          <div>
-            <label
-              htmlFor="contrasena"
-              className="mb-2 block text-sm font-medium text-zinc-200"
-            >
-              Contraseña
-            </label>
-            <input
+            <CampoFormulario
               id="contrasena"
+              etiqueta="Contraseña"
               type="password"
               value={contrasena}
               onChange={(e) => setContrasena(e.target.value)}
               placeholder="Ingresa tu contraseña"
               autoComplete="current-password"
               required
-              className="w-full rounded-xl border border-zinc-700 bg-[#09090B] px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
             />
-          </div>
 
-          {error && (
-            <p
-              role="alert"
-              className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+            {aviso && (
+              <p
+                role="status"
+                className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
+              >
+                {aviso}
+              </p>
+            )}
+
+            {error && (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+              >
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={cargando}
+              className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {error}
-            </p>
-          )}
+              {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            </button>
+          </form>
+        )}
 
+        <p className="mt-6 text-center text-sm text-zinc-400">
+          {esRegistro ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}{' '}
           <button
-            type="submit"
-            disabled={cargando}
-            className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            type="button"
+            onClick={() => cambiarModo(esRegistro ? 'login' : 'registro')}
+            className="font-semibold text-blue-400 transition hover:text-blue-300 focus:outline-none focus:underline"
           >
-            {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            {esRegistro ? 'Inicia sesión' : 'Regístrate'}
           </button>
-        </form>
+        </p>
 
         <p className="mt-7 text-center text-xs leading-5 text-zinc-500">
           J-D Delivery · Sistema de gestión de pedidos y entregas
