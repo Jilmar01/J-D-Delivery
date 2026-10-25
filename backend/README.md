@@ -1,45 +1,75 @@
-## Backend — J&D Delivery
+# Backend — J&D Delivery
 
-### Tecnologías
+## Tecnologías
 
 - Node.js
-- Express
+- Express 5
+- Prisma ORM 6
+- PostgreSQL
 - dotenv
-- PostgreSQL (integración pendiente)
 
-### Microservicios
+## Microservicios
 
-| Servicio | Puerto | Endpoint de salud |
-|---|---:|---|
-| order-service | 3001 | `/health` |
-| delivery-service | 3002 | `/health` |
-| auth-service | 3003 | `/health` |
-| notification-service | 3004 | `/health` |
+| Servicio | Puerto | Endpoint de salud | Base de datos |
+|---|---:|---|---|
+| order-service | 3001 | `/health` | `delivery_order_db` |
+| delivery-service | 3002 | `/health` | `delivery_delivery_db` |
+| auth-service | 3003 | `/health` | `delivery_auth_db` |
+| notification-service | 3004 | `/health` | `delivery_notification_db` |
 
-### Requisitos
+## Requisitos
 
-- Node.js instalado.
-- npm instalado.
-- Repositorio clonado en el equipo.
+- Node.js y npm instalados.
+- PostgreSQL instalado y ejecutándose.
+- Repositorio clonado.
 
-### Ejecución
+## Configuración
 
-Cada microservicio debe iniciarse desde su propio directorio.
+Cada microservicio debe tener su propio archivo `.env` con la variable `DATABASE_URL`.
 
-Ejemplo para el servicio de pedidos:
+Ejemplo para `order-service`:
+
+```env
+DATABASE_URL="postgresql://postgres:tu_clave@localhost:5432/delivery_order_db?schema=public"
+```
+
+Reemplaza `tu_clave` por tu contraseña de PostgreSQL.
+
+**Importante:** los archivos `.env` no deben subirse a Git.
+
+## Instalación y ejecución
+
+Ejemplo para `order-service`:
 
 ```bash
 cd backend/order-service
 npm install
+npx prisma generate
 npm run dev
 ```
 
-Para iniciar los otros servicios, sustituye `order-service` por el nombre del directorio correspondiente.
+Para ejecutar los otros servicios, sustituye `order-service` por el nombre del directorio correspondiente.
 
-### Verificación
+## Configuración de Prisma
 
-Con el servicio de pedidos en ejecución, visita:
+El esquema de la base de datos se define en `prisma/schema.prisma`.
+
+Para aplicar los cambios del esquema mediante migraciones durante el desarrollo:
+
+```bash
+npx prisma migrate dev --name init
+```
+
+Ejecuta este comando dentro del directorio del microservicio correspondiente, después de definir sus modelos en `schema.prisma`.
+
+## Verificación
+
+Con `order-service` en ejecución, visita:
 
 `http://localhost:3001/health`
 
-Cada microservicio dispone de su propio servidor Express y configuración de entorno.
+Cada microservicio dispone de su propio servidor Express, configuración de entorno y conexión a PostgreSQL mediante Prisma ORM.
+
+## Docker
+
+La configuración de Docker Compose se incorporará posteriormente para ejecutar los microservicios y sus bases de datos de forma coordinada.

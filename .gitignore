@@ -12,8 +12,13 @@ node_modules/
 !.env.example
 !**/.env.example
 
+# Código autogenerado de Prisma
+**/src/generated/prisma/
+
 # Archivos de registro y sistema
 *.log
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+/src/generated/prisma

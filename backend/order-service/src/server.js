@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import { prisma } from "../config/database.js";
 
 dotenv.config();
 
@@ -48,6 +49,11 @@ app.use((err, req, res, next) => {
     message: "Error interno del servidor",
   });
 });
+
+// Conexion con la base de datos
+prisma.$connect()
+  .then(() => console.log("Conexión con PostgreSQL exitosa"))
+  .catch((error) => console.error("Error de conexión:", error.message));
 
 // Escuchar en todas las interfaces de red
 app.listen(PORT, "0.0.0.0", () => {
