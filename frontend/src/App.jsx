@@ -1,7 +1,8 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import FormularioPedido from './components/FormularioPedido'
 import ListaPedidos from './components/ListaPedidos'
+import { obtenerPedidos, crearPedido as guardarPedido } from './services/pedidosService'
 
 function App() {
   const [pedidos, setPedidos] = useState([])
@@ -9,24 +10,44 @@ function App() {
   const [direccion, setDireccion] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
 
-  function crearPedido(e) {
-    e.preventDefault()
-
-    const nuevoPedido = {
-      id: Date.now(),
-      cliente,
-      direccion,
-      descripcion,
-      estado: 'PENDIENTE',
-      fecha: new Date().toLocaleDateString('es-EC'),
+  useEffect(() => {
+    async function cargarPedidos() {
+      try {
+        const datos = await obtenerPedidos()
+        setPedidos(datos)
+      } catch {
+        setError('No se pudieron cargar los pedidos.')
+      } finally {
+        setCargando(false)
+      }
     }
 
-    setPedidos((anteriores) => [...anteriores, nuevoPedido])
-    setCliente('')
-    setDireccion('')
-    setDescripcion('')
-    setMensaje('¡Pedido registrado correctamente!')
+    cargarPedidos()
+  }, [])
+
+  async function crearPedido(e) {
+    e.preventDefault()
+    setMensaje('')
+    setError('')
+
+    try {
+      const nuevoPedido = await guardarPedido({
+        cliente,
+        direccion,
+        descripcion,
+      })
+
+      setPedidos((anteriores) => [...anteriores, nuevoPedido])
+      setCliente('')
+      setDireccion('')
+      setDescripcion('')
+      setMensaje('¡Pedido registrado correctamente!')
+    } catch {
+      setError('No se pudo registrar el pedido. Intenta nuevamente.')
+    }
   }
 
   function actualizarEstado(id, nuevoEstado) {
@@ -86,11 +107,23 @@ function App() {
           setMensaje={setMensaje}
         />
 
-        <ListaPedidos
-          pedidos={pedidos}
-          actualizarEstado={actualizarEstado}
-          colorEstado={colorEstado}
-        />
+        {error && (
+          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        {cargando ? (
+          <section className="rounded-xl bg-white p-6 shadow-sm">
+            <p className="text-slate-500">Cargando pedidos...</p>
+          </section>
+        ) : (
+          <ListaPedidos
+            pedidos={pedidos}
+            actualizarEstado={actualizarEstado}
+            colorEstado={colorEstado}
+          />
+        )}
       </main>
 
       <footer className="px-5 py-6 text-center text-sm text-slate-500">
