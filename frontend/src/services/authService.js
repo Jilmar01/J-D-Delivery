@@ -1,26 +1,21 @@
 
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3003'
-
-/**
- * Servicio de autenticación de J-D Delivery.
- * Se conectará al microservicio auth-service.
- *
- * IMPORTANTE:
- * El backend actual todavía no tiene una ruta de inicio de sesión.
- * Por eso, esta función no simula ni inventa una autenticación exitosa.
- */
+const AUTH_API_URL =
+  import.meta.env.VITE_AUTH_API_URL || 'http://localhost:3003'
 
 export async function iniciarSesion(correo, contrasena) {
   if (!correo || !contrasena) {
     throw new Error('Ingresa tu correo y contraseña.')
   }
 
-  const respuesta = await fetch(`${AUTH_API_URL}/login`, {
+  const respuesta = await fetch(`${AUTH_API_URL}/api/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ correo, contrasena }),
+    body: JSON.stringify({
+      correo,
+      password: contrasena,
+    }),
   })
 
   const datos = await respuesta.json().catch(() => ({}))
@@ -31,9 +26,13 @@ export async function iniciarSesion(correo, contrasena) {
     )
   }
 
-  if (!datos.usuario || !datos.usuario.rol) {
-    throw new Error('La respuesta del servidor no contiene el rol del usuario.')
+  const usuario = datos.usuario || datos.data?.usuario || datos.data
+
+  if (!usuario || !usuario.rol) {
+    throw new Error(
+      'El servidor respondió, pero no se encontró el rol del usuario.'
+    )
   }
 
-  return datos.usuario
+  return usuario
 }

@@ -1,38 +1,38 @@
 
 import { useState } from 'react'
+import { iniciarSesion as autenticarUsuario } from './services/authService'
 
 function Login({ alIniciarSesion }) {
   const [correo, setCorreo] = useState('')
   const [contrasena, setContrasena] = useState('')
   const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(false)
 
-  function iniciarSesion(e) {
+  async function iniciarSesion(e) {
     e.preventDefault()
     setError('')
+    setCargando(true)
 
-    if (
-      correo.trim().toLowerCase() === 'cliente@jddelivery.com' &&
-      contrasena === 'Prueba123!'
-    ) {
-      alIniciarSesion({
-        id: 1,
-        nombre: 'Cliente de prueba',
-        correo: 'cliente@jddelivery.com',
-        rol: 'CLIENTE',
-      })
-    } else {
-      setError('Correo o contraseña incorrectos.')
+    try {
+      const usuario = await autenticarUsuario(
+        correo.trim().toLowerCase(),
+        contrasena
+      )
+
+      alIniciarSesion(usuario)
+    } catch (err) {
+      setError(err.message || 'No se pudo iniciar sesión. Intenta nuevamente.')
+    } finally {
+      setCargando(false)
     }
   }
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#09090B] px-4 py-10">
-      {/* Luces decorativas del fondo */}
       <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl" />
       <div className="absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
 
       <section className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#18181B] p-8 shadow-2xl shadow-black/40 sm:p-10">
-        {/* Logo y nombre */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/30">
             <svg
@@ -62,17 +62,13 @@ function Login({ alIniciarSesion }) {
           </p>
         </div>
 
-        {/* Bienvenida */}
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-white">
-            Bienvenido
-          </h2>
+          <h2 className="text-xl font-semibold text-white">Bienvenido</h2>
           <p className="mt-1 text-sm text-zinc-400">
             Ingresa tus datos para continuar.
           </p>
         </div>
 
-        {/* Formulario */}
         <form onSubmit={iniciarSesion} className="space-y-5">
           <div>
             <label
@@ -81,13 +77,12 @@ function Login({ alIniciarSesion }) {
             >
               Correo electrónico
             </label>
-
             <input
               id="correo"
               type="email"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
-              placeholder="cliente@jddelivery.com"
+              placeholder="cliente@ejemplo.com"
               autoComplete="username"
               required
               className="w-full rounded-xl border border-zinc-700 bg-[#09090B] px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
@@ -101,7 +96,6 @@ function Login({ alIniciarSesion }) {
             >
               Contraseña
             </label>
-
             <input
               id="contrasena"
               type="password"
@@ -125,13 +119,13 @@ function Login({ alIniciarSesion }) {
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 active:scale-[0.99]"
+            disabled={cargando}
+            className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Iniciar sesión
+            {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
 
-        {/* Pie de página */}
         <p className="mt-7 text-center text-xs leading-5 text-zinc-500">
           J-D Delivery · Sistema de gestión de pedidos y entregas
         </p>
