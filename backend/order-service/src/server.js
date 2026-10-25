@@ -2,6 +2,9 @@ import express from "express";
 import dotenv from "dotenv";
 import { prisma } from "../config/database.js";
 
+// Rutas de Endpoints
+import pedidoRoutes from "./routes/pedido.routes.js";
+
 dotenv.config();
 
 const app = express();
@@ -20,6 +23,9 @@ app.get("/", (req, res) => {
     message: "Microservicio de pedidos funcionando",
   });
 });
+
+// Ruta pedidos
+app.use("/api/pedidos", pedidoRoutes);
 
 // Endpoint de salud
 app.get("/health", (req, res) => {
