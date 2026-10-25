@@ -4,12 +4,11 @@ import { prisma } from "../../config/database.js";
 
 const router = Router();
 
-// POST /api/pedidos
+// POST /api/pedidos - Crear pedido
 router.post("/", async (req, res) => {
   try {
     const { clienteId, descripcion, total } = req.body;
 
-    // Validar datos obligatorios
     if (
       typeof clienteId !== "string" ||
       !clienteId.trim() ||
@@ -23,20 +22,15 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Validar el total
     const totalNumero = Number(total);
 
-    if (
-      !Number.isFinite(totalNumero) ||
-      totalNumero <= 0
-    ) {
+    if (!Number.isFinite(totalNumero) || totalNumero <= 0) {
       return res.status(400).json({
         success: false,
         message: "El total debe ser un número mayor que cero",
       });
     }
 
-    // Validar la descripción
     if (
       descripcion !== undefined &&
       descripcion !== null &&
@@ -48,7 +42,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Crear el pedido en PostgreSQL mediante Prisma
     const pedido = await prisma.pedido.create({
       data: {
         clienteId: clienteId.trim(),
@@ -63,11 +56,72 @@ router.post("/", async (req, res) => {
       data: pedido,
     });
   } catch (error) {
-    console.error("Error al crear el pedido:", error);
+    console.error("Error al crear pedido:", error);
 
     return res.status(500).json({
       success: false,
       message: "Error interno al crear el pedido",
+    });
+  }
+});
+
+// GET /api/pedidos - Consultar todos los pedidos
+router.get("/", async (req, res) => {
+  try {
+    const pedidos = await prisma.pedido.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      total: pedidos.length,
+      data: pedidos,
+    });
+  } catch (error) {
+    console.error("Error al consultar pedidos:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno al consultar los pedidos",
+    });
+  }
+});
+
+// GET /api/pedidos/:id - Consultar un pedido por ID
+router.get("/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "El ID del pedido debe ser un entero positivo",
+      });
+    }
+
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({
+        success: false,
+        message: "Pedido no encontrado",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: pedido,
+    });
+  } catch (error) {
+    console.error("Error al consultar pedido:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno al consultar el pedido",
     });
   }
 });
