@@ -126,4 +126,79 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// PATCH /api/pedidos/:id/estado
+router.patch("/:id/estado", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { estado } = req.body;
+
+    // Validar ID
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "El ID debe ser un número entero positivo",
+      });
+    }
+
+    // Validar estado
+    const transiciones = {
+      PENDIENTE: ["CONFIRMADO", "CANCELADO"],
+      CONFIRMADO: ["EN_PREPARACION", "CANCELADO"],
+      EN_PREPARACION: ["EN_CAMINO", "CANCELADO"],
+      EN_CAMINO: ["ENTREGADO"],
+      ENTREGADO: [],
+      CANCELADO: [],
+    };
+
+    if (
+      typeof estado !== "string" ||
+      !Object.prototype.hasOwnProperty.call(transiciones, estado)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "El estado proporcionado no es válido",
+      });
+    }
+
+    // Buscar pedido
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({
+        success: false,
+        message: "Pedido no encontrado",
+      });
+    }
+
+    // Validar transición
+    if (!transiciones[pedido.estado].includes(estado)) {
+      return res.status(409).json({
+        success: false,
+        message: `No se permite cambiar de ${pedido.estado} a ${estado}`,
+      });
+    }
+
+    // Actualizar estado
+    const pedidoActualizado = await prisma.pedido.update({
+      where: { id },
+      data: { estado },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Estado del pedido actualizado correctamente",
+      data: pedidoActualizado,
+    });
+  } catch (error) {
+    console.error("Error al actualizar estado:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno al actualizar el estado del pedido",
+    });
+  }
+});
+
 export default router;
