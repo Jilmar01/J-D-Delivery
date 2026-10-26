@@ -16,8 +16,26 @@ function FormularioRegistro({ alRegistrar }) {
     e.preventDefault()
     setError('')
 
+    const usuario = nombre.trim()
+    const correoNormalizado = correo.trim().toLowerCase()
+
+    if (!usuario || !correoNormalizado || !contrasena) {
+      setError('Completa todos los campos.')
+      return
+    }
+
     if (contrasena !== confirmacion) {
       setError('Las contraseñas no coinciden.')
+      return
+    }
+
+    if (contrasena.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (!['CLIENTE', 'REPARTIDOR'].includes(rol)) {
+      setError('Selecciona un tipo de cuenta válido.')
       return
     }
 
@@ -25,13 +43,13 @@ function FormularioRegistro({ alRegistrar }) {
 
     try {
       await registrarUsuario({
-        nombre: nombre.trim(),
-        correo: correo.trim().toLowerCase(),
+        usuario,
+        correo: correoNormalizado,
         contrasena,
         rol,
       })
 
-      alRegistrar(correo.trim().toLowerCase())
+      alRegistrar(correoNormalizado)
     } catch (err) {
       setError(err.message || 'No se pudo crear la cuenta. Intenta nuevamente.')
     } finally {

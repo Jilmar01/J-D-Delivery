@@ -47,6 +47,15 @@ function Login({ alIniciarSesion }) {
     setAviso('Cuenta creada correctamente. Ahora inicia sesión.')
   }
 
+  function entrarEnDemo(rol) {
+    alIniciarSesion({
+      nombre: rol === 'CLIENTE' ? 'Cliente de demostración' : 'Repartidor de demostración',
+      correo: rol === 'CLIENTE' ? 'cliente.demo@ejemplo.com' : 'repartidor.demo@ejemplo.com',
+      rol,
+      modoDemostracion: true,
+    })
+  }
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#09090B] px-4 py-10">
       <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl" />
@@ -96,55 +105,84 @@ function Login({ alIniciarSesion }) {
         {esRegistro ? (
           <FormularioRegistro alRegistrar={alRegistrar} />
         ) : (
-          <form onSubmit={iniciarSesion} className="space-y-5">
-            <CampoFormulario
-              id="correo"
-              etiqueta="Correo electrónico"
-              type="email"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              placeholder="cliente@ejemplo.com"
-              autoComplete="username"
-              required
-            />
+          <>
+            <form onSubmit={iniciarSesion} className="space-y-5">
+              <CampoFormulario
+                id="correo"
+                etiqueta="Correo electrónico"
+                type="email"
+                value={correo}
+                onChange={(e) => setCorreo(e.target.value)}
+                placeholder="cliente@ejemplo.com"
+                autoComplete="username"
+                required
+              />
 
-            <CampoFormulario
-              id="contrasena"
-              etiqueta="Contraseña"
-              type="password"
-              value={contrasena}
-              onChange={(e) => setContrasena(e.target.value)}
-              placeholder="Ingresa tu contraseña"
-              autoComplete="current-password"
-              required
-            />
+              <CampoFormulario
+                id="contrasena"
+                etiqueta="Contraseña"
+                type="password"
+                value={contrasena}
+                onChange={(e) => setContrasena(e.target.value)}
+                placeholder="Ingresa tu contraseña"
+                autoComplete="current-password"
+                required
+              />
 
-            {aviso && (
-              <p
-                role="status"
-                className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
+              {aviso && (
+                <p
+                  role="status"
+                  className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400"
+                >
+                  {aviso}
+                </p>
+              )}
+
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+                >
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={cargando}
+                className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {aviso}
-              </p>
-            )}
+                {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
+              </button>
+            </form>
 
-            {error && (
-              <p
-                role="alert"
-                className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
-              >
-                {error}
-              </p>
+            {import.meta.env.DEV && (
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <p className="mb-3 text-center text-sm font-medium text-zinc-300">
+                  ¿Solo quieres revisar las vistas?
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => entrarEnDemo('CLIENTE')}
+                    className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-3 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+                  >
+                    Vista de cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => entrarEnDemo('REPARTIDOR')}
+                    className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+                  >
+                    Vista de repartidor
+                  </button>
+                </div>
+                <p className="mt-3 text-center text-xs text-zinc-500">
+                  Acceso local de prueba; no valida una cuenta real.
+                </p>
+              </div>
             )}
-
-            <button
-              type="submit"
-              disabled={cargando}
-              className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {cargando ? 'Iniciando sesión...' : 'Iniciar sesión'}
-            </button>
-          </form>
+          </>
         )}
 
         <p className="mt-6 text-center text-sm text-zinc-400">

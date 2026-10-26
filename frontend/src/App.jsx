@@ -39,6 +39,15 @@ function App() {
         alCerrarSesion={() => setUsuario(null)}
       />
 
+      {usuario.modoDemostracion && (
+        <p
+          role="status"
+          className="border-b border-amber-500/20 bg-amber-500/10 px-5 py-3 text-center text-sm text-amber-300"
+        >
+          Modo demostración local: los datos no se guardan en el backend.
+        </p>
+      )}
+
       <VistaPorRol usuario={usuario} />
 
       <footer className="border-t border-white/10 px-5 py-6 text-center text-xs text-zinc-500">
