@@ -1,5 +1,9 @@
 import express from "express";
 import dotenv from "dotenv";
+import { prisma } from "../config/database.js";
+
+// Rutas de Endpoints
+import authRoutes from "./routes/auth.routes.js";
 
 dotenv.config();
 
@@ -20,6 +24,9 @@ app.get("/", (req, res) => {
   });
 });
 
+// Ruta autenticación
+app.use("/api/auth", authRoutes);
+
 // Endpoint de salud
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -39,6 +46,12 @@ app.use((req, res) => {
   });
 });
 
+// Conexion con la base de datos
+prisma.$connect()
+  .then(() => console.log("Conexión con PostgreSQL exitosa"))
+  .catch((error) => console.error("Error de conexión:", error.message));
+
+
 // Manejo básico de errores
 app.use((err, req, res, next) => {
   console.error("Error en el servidor:", err);
@@ -48,6 +61,8 @@ app.use((err, req, res, next) => {
     message: "Error interno del servidor",
   });
 });
+
+
 
 // Escuchar en todas las interfaces de red
 app.listen(PORT, "0.0.0.0", () => {
