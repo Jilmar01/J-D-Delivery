@@ -2,9 +2,12 @@
 import InsigniaRol from './InsigniaRol'
 
 function EncabezadoApp({ usuario, alCerrarSesion }) {
-  const nombre = usuario.nombre || usuario.correo
   const esCliente = usuario.rol === 'CLIENTE'
-  const iniciales = (usuario.nombre || usuario.correo || 'JD')
+  const nombre = esCliente
+    ? usuario.nombre?.trim() || 'Mi cuenta'
+    : usuario.nombre || usuario.correo
+  const nombreParaIniciales = usuario.nombre?.trim() || 'Mi cuenta'
+  const iniciales = nombreParaIniciales
     .split(/\s+/)
     .slice(0, 2)
     .map((parte) => parte[0])
@@ -128,13 +131,9 @@ function EncabezadoApp({ usuario, alCerrarSesion }) {
             >
               {nombre}
             </p>
-            {usuario.nombre && usuario.correo && (
+            {!esCliente && usuario.nombre && usuario.correo && (
               <p
-                className={`text-xs text-zinc-500 ${
-                  esCliente
-                    ? 'hidden max-w-56 truncate sm:block'
-                    : ''
-                }`}
+                className="text-xs text-zinc-500"
               >
                 {usuario.correo}
               </p>

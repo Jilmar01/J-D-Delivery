@@ -1,4 +1,9 @@
 
+import {
+  etiquetaEstado,
+  ESTADOS_PROGRESO_PEDIDO,
+} from '../utils/estados'
+
 const ESTILOS_ESTADO = {
   PENDIENTE: 'border-amber-200 bg-amber-50 text-amber-800',
   ASIGNADO: 'border-blue-200 bg-blue-50 text-blue-800',
@@ -7,7 +12,7 @@ const ESTILOS_ESTADO = {
   CANCELADO: 'border-red-200 bg-red-50 text-red-800',
 }
 
-function ListaPedidos({ pedidos, actualizarEstado }) {
+function ListaPedidos({ pedidos }) {
   return (
     <section className="rounded-xl bg-transparent">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -74,7 +79,7 @@ function ListaPedidos({ pedidos, actualizarEstado }) {
                     'border-slate-200 bg-slate-100 text-slate-700'
                   }`}
                 >
-                  {pedido.estado.replace('_', ' ')}
+                  {etiquetaEstado(pedido.estado)}
                 </span>
               </div>
 
@@ -118,53 +123,73 @@ function ListaPedidos({ pedidos, actualizarEstado }) {
 
               <div className="mt-6 border-t border-slate-100 pt-5">
                 <h4 className="text-sm font-semibold text-slate-800">
-                  Seguimiento del pedido
+                  Progreso del pedido
                 </h4>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {[
-                    'PENDIENTE',
-                    'ASIGNADO',
-                    'EN_CAMINO',
-                    'ENTREGADO',
-                  ].map((estado) => (
-                    <span
-                      key={estado}
-                      className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
-                        pedido.estado === estado
-                          ? ESTILOS_ESTADO[estado]
-                          : 'border-slate-200 bg-slate-50 text-slate-500'
-                      }`}
-                    >
-                      {estado.replace('_', ' ')}
-                    </span>
-                  ))}
-                </div>
-
-                <label
-                  htmlFor={`estado-${pedido.id}`}
-                  className="mb-2 mt-5 block text-sm font-semibold text-slate-700"
+                <ol
+                  aria-label={`Progreso del pedido: ${etiquetaEstado(pedido.estado)}`}
+                  className="mt-4 grid grid-cols-4 gap-2"
                 >
-                  Estado de demostración
-                </label>
+                  {ESTADOS_PROGRESO_PEDIDO.map((estado, indice) => {
+                    const indiceActual =
+                      ESTADOS_PROGRESO_PEDIDO.indexOf(pedido.estado)
+                    const completado =
+                      indiceActual >= 0 && indice <= indiceActual
 
-                <select
-                  id={`estado-${pedido.id}`}
-                  value={pedido.estado}
-                  onChange={(e) =>
-                    actualizarEstado(pedido.id, e.target.value)
-                  }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition hover:border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 sm:max-w-xs"
-                >
-                  <option value="PENDIENTE">Pendiente</option>
-                  <option value="ASIGNADO">Asignado</option>
-                  <option value="EN_CAMINO">En camino</option>
-                  <option value="ENTREGADO">Entregado</option>
-                  <option value="CANCELADO">Cancelado</option>
-                </select>
-
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Los cambios de estado son solo para pruebas locales.
+                    return (
+                      <li
+                        key={estado}
+                        aria-current={
+                          indice === indiceActual ? 'step' : undefined
+                        }
+                        className="min-w-0 text-center"
+                      >
+                        <span
+                          className={`mx-auto block h-2 rounded-full ${
+                            completado ? 'bg-blue-600' : 'bg-slate-200'
+                          }`}
+                        />
+                        <span
+                          className={`mt-2 block break-words text-[10px] font-semibold leading-4 sm:text-xs ${
+                            indice === indiceActual
+                              ? 'text-blue-800'
+                              : completado
+                                ? 'text-slate-700'
+                                : 'text-slate-400'
+                          }`}
+                        >
+                          {etiquetaEstado(estado)}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ol>
+                {pedido.estado === 'CANCELADO' ? (
+                  <p className="mt-3 text-sm leading-6 text-red-700">
+                    Este pedido está cancelado; no avanzará por las etapas de
+                    entrega.
+                  </p>
+                ) : ESTADOS_PROGRESO_PEDIDO.includes(pedido.estado) ? (
+                  <>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                      Tu pedido está{' '}
+                      <span className="font-semibold text-slate-800">
+                        {etiquetaEstado(pedido.estado)}
+                      </span>.
+                    </p>
+                    {pedido.estado === 'EN_CAMINO' && (
+                      <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                        El repartidor inició la entrega.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Estado actual: {etiquetaEstado(pedido.estado)}. El progreso
+                    visual no está disponible para este estado.
+                  </p>
+                )}
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Estado informativo; no hay seguimiento GPS en tiempo real.
                 </p>
               </div>
             </article>

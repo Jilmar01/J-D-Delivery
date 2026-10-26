@@ -1,4 +1,7 @@
 
+import { useCallback } from 'react'
+import MapaUbicacion from './MapaUbicacion'
+
 function FormularioPedido({
   cliente,
   setCliente,
@@ -6,12 +9,38 @@ function FormularioPedido({
   setDireccion,
   descripcion,
   setDescripcion,
+  ubicacionPendiente,
+  ubicacionConfirmada,
+  setUbicacionPendiente,
+  confirmarUbicacion,
   crearPedido,
   mensaje,
   setMensaje,
 }) {
   const estiloCampo =
     'w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-sm shadow-slate-200/50 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
+
+  const alCambiarUbicacionPendiente = useCallback(
+    (ubicacion) => {
+      setUbicacionPendiente(ubicacion)
+      if (ubicacionConfirmada) confirmarUbicacion(null)
+      setMensaje('')
+    },
+    [
+      confirmarUbicacion,
+      setMensaje,
+      setUbicacionPendiente,
+      ubicacionConfirmada,
+    ]
+  )
+  const alConfirmarUbicacion = useCallback(
+    (ubicacion) => {
+      confirmarUbicacion(ubicacion)
+      setDireccion(ubicacion.direccion || '')
+      setMensaje('')
+    },
+    [confirmarUbicacion, setDireccion, setMensaje]
+  )
 
   return (
     <section className="rounded-xl bg-transparent">
@@ -38,26 +67,36 @@ function FormularioPedido({
               required
             />
           </div>
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="direccion"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
+                Dirección de entrega
+              </label>
 
-          <div>
-            <label
-              htmlFor="direccion"
-              className="mb-2 block text-sm font-semibold text-slate-700"
-            >
-              Dirección de entrega
-            </label>
+              <input
+                id="direccion"
+                type="text"
+                value={direccion}
+                onChange={(e) => {
+                  setDireccion(e.target.value)
+                  setUbicacionPendiente(null)
+                  if (ubicacionConfirmada) confirmarUbicacion(null)
+                  setMensaje('')
+                }}
+                placeholder="Ej. Quito, sector centro"
+                className={estiloCampo}
+                required
+              />
+            </div>
 
-            <input
-              id="direccion"
-              type="text"
-              value={direccion}
-              onChange={(e) => {
-                setDireccion(e.target.value)
-                setMensaje('')
-              }}
-              placeholder="Ej. Quito, sector centro"
-              className={estiloCampo}
-              required
+            <MapaUbicacion
+              ubicacionPendiente={ubicacionPendiente}
+              ubicacionConfirmada={ubicacionConfirmada}
+              alCambiarUbicacionPendiente={alCambiarUbicacionPendiente}
+              alConfirmarUbicacion={alConfirmarUbicacion}
             />
           </div>
         </div>

@@ -4,12 +4,16 @@ import {
   obtenerPedidos,
   actualizarEstadoPedido,
 } from '../services/pedidosService'
-import { etiquetaEstado } from '../utils/estados'
+import {
+  etiquetaEstado,
+  SIGUIENTE_ESTADO_PEDIDO,
+  permiteTransicionPedido,
+} from '../utils/estados'
 
 const SIGUIENTE_ACCION = {
-  PENDIENTE: { estado: 'ASIGNADO', texto: 'Aceptar pedido' },
-  ASIGNADO: { estado: 'EN_CAMINO', texto: 'Iniciar entrega' },
-  EN_CAMINO: { estado: 'ENTREGADO', texto: 'Marcar como entregado' },
+  PENDIENTE: { texto: 'Aceptar pedido' },
+  ASIGNADO: { texto: 'Iniciar entrega' },
+  EN_CAMINO: { texto: 'Marcar como entregado' },
 }
 
 const ESTILOS_ESTADO = {
@@ -42,11 +46,13 @@ function PanelRepartidor() {
   async function avanzarEstado(pedido) {
     const accion = SIGUIENTE_ACCION[pedido.estado]
     if (!accion) return
+    const nuevoEstado = SIGUIENTE_ESTADO_PEDIDO[pedido.estado]
+    if (!permiteTransicionPedido(pedido.estado, nuevoEstado)) return
 
     setError('')
 
     try {
-      const actualizado = await actualizarEstadoPedido(pedido.id, accion.estado)
+      const actualizado = await actualizarEstadoPedido(pedido.id, nuevoEstado)
       setPedidos((anteriores) =>
         anteriores.map((p) => (p.id === actualizado.id ? actualizado : p))
       )

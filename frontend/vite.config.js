@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/auth': {
-        target: 'http://localhost:3003',
+        target: 'https://gph6pj52-3003.use2.devtunnels.ms',
         changeOrigin: true,
       },
     },

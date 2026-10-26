@@ -7,7 +7,7 @@ async function solicitarAuth(ruta, opciones) {
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(
-        'No se pudo conectar con autenticación. Verifica que el servicio esté activo en http://localhost:3003.',
+        'No se pudo conectar con autenticación. Verifica que el servicio configurado esté activo.',
         { cause: error }
       )
     }

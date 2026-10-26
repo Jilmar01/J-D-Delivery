@@ -3,24 +3,104 @@ import { useEffect, useState } from 'react'
 import FormularioPedido from './FormularioPedido'
 import ListaPedidos from './ListaPedidos'
 import {
-  obtenerPedidos,
+  obtenerPedidosCliente,
   crearPedido as guardarPedido,
 } from '../services/pedidosService'
+import pizza from '../assets/images/pizza.jpg'
+import hamburguesa from '../assets/images/hamburguesa.jpg'
+import sushi from '../assets/images/sushi.jpg'
+import pollo from '../assets/images/pollo.jpg'
+import ensalada from '../assets/images/ensalada.jpg'
 
 const CATEGORIAS_DEMO = [
-  { nombre: 'Restaurantes', icono: '🍽️', color: 'bg-orange-50 text-orange-600' },
-  { nombre: 'Súper', icono: '🛒', color: 'bg-emerald-50 text-emerald-600' },
-  { nombre: 'Farmacias', icono: '✚', color: 'bg-rose-50 text-rose-600' },
-  { nombre: 'Bebidas', icono: '🥤', color: 'bg-cyan-50 text-cyan-700' },
-  { nombre: 'Tiendas', icono: '🏪', color: 'bg-violet-50 text-violet-600' },
-  { nombre: 'Mascotas', icono: '🐾', color: 'bg-amber-50 text-amber-700' },
+  { nombre: 'Restaurantes', icono: 'restaurante', imagen: hamburguesa },
+  { nombre: 'Súper', icono: 'super', imagen: ensalada },
+  { nombre: 'Farmacias', icono: 'farmacia' },
+  { nombre: 'Bebidas', icono: 'bebidas' },
+  { nombre: 'Tiendas', icono: 'tiendas' },
+  { nombre: 'Mascotas', icono: 'mascotas' },
 ]
+
+const COMIDAS_DEMO = [
+  { nombre: 'Pizza', imagen: pizza, alt: 'Fotografía de referencia de pizza' },
+  {
+    nombre: 'Hamburguesa',
+    imagen: hamburguesa,
+    alt: 'Fotografía de referencia de hamburguesa',
+  },
+  { nombre: 'Sushi', imagen: sushi, alt: 'Fotografía de referencia de sushi' },
+  { nombre: 'Pollo', imagen: pollo, alt: 'Fotografía de referencia de pollo' },
+  {
+    nombre: 'Ensalada',
+    imagen: ensalada,
+    alt: 'Fotografía de referencia de ensalada',
+  },
+]
+
+function IconoCategoria({ tipo }) {
+  const iconos = {
+    restaurante: (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 3v7m-3-7v4a3 3 0 0 0 6 0V3m-3 7v11M16 3v18m0-18c3 2 4 5 4 8h-4" />
+      </>
+    ),
+    super: (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 1.9-1.4L21 8H6" />
+        <circle cx="10" cy="20" r="1" />
+        <circle cx="18" cy="20" r="1" />
+      </>
+    ),
+    farmacia: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path strokeLinecap="round" d="M12 7v10M7 12h10" />
+      </>
+    ),
+    bebidas: (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h12l-1 17H7L6 4Zm3 0V2h6v2m-7 5h10" />
+      </>
+    ),
+    tiendas: (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16l-1-5H5L4 9Zm1 0v11h14V9m-9 11v-6h4v6" />
+        <path strokeLinecap="round" d="M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0" />
+      </>
+    ),
+    mascotas: (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 12c-2 0-4 2-4 4 0 2 2 3 4 2l2-1h4l2 1c2 1 4 0 4-2 0-2-2-4-4-4-1 0-2 1-4 1s-3-1-4-1Z" />
+        <circle cx="6" cy="8" r="1.5" />
+        <circle cx="10" cy="6" r="1.5" />
+        <circle cx="14" cy="6" r="1.5" />
+        <circle cx="18" cy="8" r="1.5" />
+      </>
+    ),
+  }
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      className="h-6 w-6"
+      aria-hidden="true"
+    >
+      {iconos[tipo]}
+    </svg>
+  )
+}
 
 function PortalCliente({ usuario }) {
   const [pedidos, setPedidos] = useState([])
   const [cliente, setCliente] = useState(usuario.nombre || '')
   const [direccion, setDireccion] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [ubicacionPendiente, setUbicacionPendiente] = useState(null)
+  const [ubicacionConfirmada, setUbicacionConfirmada] = useState(null)
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
@@ -28,7 +108,7 @@ function PortalCliente({ usuario }) {
   useEffect(() => {
     async function cargarPedidos() {
       try {
-        const datos = await obtenerPedidos()
+        const datos = await obtenerPedidosCliente(usuario.correo)
         setPedidos(datos)
       } catch {
         setError('No se pudieron cargar los pedidos.')
@@ -38,7 +118,7 @@ function PortalCliente({ usuario }) {
     }
 
     cargarPedidos()
-  }, [])
+  }, [usuario.correo])
 
   async function crearPedido(e) {
     e.preventDefault()
@@ -50,24 +130,18 @@ function PortalCliente({ usuario }) {
         cliente,
         direccion,
         descripcion,
-      })
+      }, usuario.correo)
 
       setPedidos((anteriores) => [...anteriores, nuevoPedido])
       setCliente(usuario.nombre || '')
       setDireccion('')
       setDescripcion('')
+      setUbicacionPendiente(null)
+      setUbicacionConfirmada(null)
       setMensaje('¡Pedido registrado correctamente!')
     } catch {
       setError('No se pudo registrar el pedido. Intenta nuevamente.')
     }
-  }
-
-  function actualizarEstado(id, nuevoEstado) {
-    setPedidos((anteriores) =>
-      anteriores.map((pedido) =>
-        pedido.id === id ? { ...pedido, estado: nuevoEstado } : pedido
-      )
-    )
   }
 
   const nombreCorto = usuario.nombre?.trim().split(/\s+/)[0] || 'cliente'
@@ -76,17 +150,14 @@ function PortalCliente({ usuario }) {
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-7 sm:space-y-10 sm:px-8 sm:py-10">
         <section className="relative isolate min-h-[320px] overflow-hidden rounded-3xl bg-[#07172D] shadow-xl shadow-blue-950/10 sm:min-h-[350px] lg:min-h-[390px]">
-          <div className="absolute inset-0 -z-20 bg-gradient-to-br from-[#0B2A50] via-[#0B1D38] to-[#061226]" />
+          <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#0B2A50] via-[#0B1D38] to-[#061226]" />
           <img
-            src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1600&q=85"
-            alt=""
-            className="absolute inset-y-0 right-0 -z-10 h-full w-full object-cover object-center opacity-55 sm:w-3/4 sm:opacity-70"
-            onError={(evento) => {
-              evento.currentTarget.style.display = 'none'
-            }}
+            src={pizza}
+            alt="Fotografía de referencia de pizza"
+            className="absolute inset-y-0 right-0 z-0 h-full w-full object-cover object-center opacity-55 sm:w-3/4 sm:opacity-70"
           />
-          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#07172D] via-[#07172D]/90 to-[#07172D]/30 sm:to-transparent" />
-          <div className="relative flex min-h-[320px] flex-col justify-center p-6 sm:min-h-[350px] sm:p-10 lg:min-h-[390px] lg:p-14">
+          <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#07172D] via-[#07172D]/90 to-[#07172D]/30 sm:to-transparent" />
+          <div className="relative z-20 flex min-h-[320px] flex-col justify-center p-6 sm:min-h-[350px] sm:p-10 lg:min-h-[390px] lg:p-14">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-300 sm:text-sm">
               J-D Delivery
             </p>
@@ -136,18 +207,65 @@ function PortalCliente({ usuario }) {
             {CATEGORIAS_DEMO.map((categoria) => (
               <div
                 key={categoria.nombre}
-                className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm shadow-slate-200/50"
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-center shadow-sm shadow-slate-200/50 transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl ${categoria.color}`}
-                  aria-hidden="true"
-                >
-                  {categoria.icono}
-                </span>
-                <span className="text-sm font-semibold text-slate-800">
+                {categoria.imagen ? (
+                  <img
+                    src={categoria.imagen}
+                    alt=""
+                    className="h-24 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-28"
+                  />
+                ) : (
+                  <span className="flex h-24 items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 text-blue-700 sm:h-28">
+                    <IconoCategoria tipo={categoria.icono} />
+                  </span>
+                )}
+                <span className="block px-2 py-3 text-sm font-semibold text-slate-800">
                   {categoria.nombre}
                 </span>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="inspiracion-titulo">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+                Ideas para tu próximo pedido
+              </p>
+              <h2
+                id="inspiracion-titulo"
+                className="mt-1 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl"
+              >
+                Inspiración gastronómica
+              </h2>
+            </div>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+              Solo demostración · no disponible para compra
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {COMIDAS_DEMO.map((comida) => (
+              <article
+                key={comida.nombre}
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/50"
+              >
+                <img
+                  src={comida.imagen}
+                  alt={comida.alt}
+                  loading="lazy"
+                  className="h-32 w-full object-cover sm:h-36"
+                />
+                <div className="p-3">
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    {comida.nombre}
+                  </h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Imagen de referencia
+                  </p>
+                </div>
+              </article>
             ))}
           </div>
         </section>
@@ -222,45 +340,6 @@ function PortalCliente({ usuario }) {
           </div>
         </section>
 
-        <section aria-labelledby="restaurantes-titulo">
-          <div className="mb-4">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-              Para ti
-            </p>
-            <h2
-              id="restaurantes-titulo"
-              className="mt-1 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl"
-            >
-              Restaurantes populares
-            </h2>
-          </div>
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-9 text-center shadow-sm shadow-slate-200/40 sm:py-11">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                className="h-6 w-6"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 10h16l-1 10H5L4 10ZM3 10l2-6h14l2 6M9 14h6"
-                />
-              </svg>
-            </span>
-            <p className="mt-4 font-semibold text-slate-800">
-              Todavía no hay restaurantes para mostrar.
-            </p>
-            <p className="mt-1.5 text-sm text-slate-500">
-              Cuando el catálogo esté disponible, podrás explorar sus menús aquí.
-            </p>
-          </div>
-        </section>
-
         <section
           id="crear-pedido"
           className="scroll-mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70"
@@ -282,6 +361,10 @@ function PortalCliente({ usuario }) {
               setDireccion={setDireccion}
               descripcion={descripcion}
               setDescripcion={setDescripcion}
+              ubicacionPendiente={ubicacionPendiente}
+              ubicacionConfirmada={ubicacionConfirmada}
+              setUbicacionPendiente={setUbicacionPendiente}
+              confirmarUbicacion={setUbicacionConfirmada}
               crearPedido={crearPedido}
               mensaje={mensaje}
               setMensaje={setMensaje}
@@ -317,7 +400,6 @@ function PortalCliente({ usuario }) {
             ) : (
               <ListaPedidos
                 pedidos={pedidos}
-                actualizarEstado={actualizarEstado}
               />
             )}
           </div>
