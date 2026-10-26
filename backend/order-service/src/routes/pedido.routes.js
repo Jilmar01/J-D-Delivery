@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/database.js";
+import { autorizarAdministrador } from "../middleware/autorizarAdministrador.js";
+import { publicarEventoPedido } from "../services/pedidoEvents.js";
 
 const router = Router();
 
@@ -50,6 +52,8 @@ router.post("/", async (req, res) => {
       },
     });
 
+    publicarEventoPedido("PEDIDO_CREADO", pedido);
+
     return res.status(201).json({
       success: true,
       message: "Pedido creado correctamente",
@@ -66,7 +70,7 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/pedidos - Consultar todos los pedidos
-router.get("/", async (req, res) => {
+router.get("/", autorizarAdministrador, async (req, res) => {
   try {
     const pedidos = await prisma.pedido.findMany({
       orderBy: {
@@ -90,7 +94,7 @@ router.get("/", async (req, res) => {
 });
 
 // GET /api/pedidos/:id - Consultar un pedido por ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", autorizarAdministrador, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -127,7 +131,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PATCH /api/pedidos/:id/estado
-router.patch("/:id/estado", async (req, res) => {
+router.patch("/:id/estado", autorizarAdministrador, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const { estado } = req.body;
@@ -185,6 +189,8 @@ router.patch("/:id/estado", async (req, res) => {
       where: { id },
       data: { estado },
     });
+
+    publicarEventoPedido("PEDIDO_ACTUALIZADO", pedidoActualizado);
 
     return res.status(200).json({
       success: true,

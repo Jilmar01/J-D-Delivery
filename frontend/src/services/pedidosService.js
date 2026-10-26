@@ -1,10 +1,13 @@
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_URL = (
+  import.meta.env.VITE_API_URL || 'http://localhost:3001'
+).replace(/\/$/, '')
+const WS_URL =
+  import.meta.env.VITE_WS_URL || `${API_URL.replace(/^http/, 'ws')}/ws`
 
 /**
- * Servicio de pedidos.
- * Por ahora permite trabajar con datos simulados.
- * Cuando conozcamos los endpoints reales, conectaremos el backend.
+ * Las vistas de cliente y repartidor conservan sus datos simulados.
+ * El panel administrativo usa los métodos REST de abajo.
  */
 
 const pedidosSimulados = []
@@ -40,4 +43,81 @@ export async function actualizarEstadoPedido(id, estado) {
   return { ...pedido }
 }
 
-export { API_URL }
+function normalizarPedidoAdministrativo(pedido) {
+  const id = Number(pedido?.id)
+
+  if (!pedido || typeof pedido !== 'object' || !Number.isSafeInteger(id)) {
+    throw new Error('El servidor devolvió un pedido con formato no válido.')
+  }
+
+  return {
+    ...pedido,
+    id,
+    cliente: pedido.clienteId || `Cliente ${pedido.id}`,
+    repartidor: pedido.repartidorId
+      ? `Repartidor ${pedido.repartidorId}`
+      : 'Sin asignar',
+    fecha: pedido.createdAt
+      ? new Date(pedido.createdAt).toLocaleString('es-EC')
+      : '—',
+  }
+}
+
+async function solicitarPedidos(ruta, token, opciones = {}) {
+  if (!token) {
+    throw new Error('La sesión administrativa expiró. Inicia sesión nuevamente.')
+  }
+
+  const respuesta = await fetch(`${API_URL}${ruta}`, {
+    ...opciones,
+    headers: {
+      ...opciones.headers,
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  const datos = await respuesta.json().catch(() => null)
+
+  if (!respuesta.ok) {
+    throw new Error(
+      datos?.message || `La API de pedidos respondió con ${respuesta.status}.`
+    )
+  }
+
+  return datos
+}
+
+export async function obtenerPedidosAdministrativos(token) {
+  const respuesta = await solicitarPedidos('/api/pedidos', token)
+
+  if (!Array.isArray(respuesta?.data)) {
+    throw new Error('La API no devolvió una lista válida de pedidos.')
+  }
+
+  return respuesta.data.map(normalizarPedidoAdministrativo)
+}
+
+export async function cambiarEstadoAdministrativo(id, estado, token) {
+  const respuesta = await solicitarPedidos(
+    `/api/pedidos/${id}/estado`,
+    token,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ estado }),
+    },
+  )
+
+  if (!respuesta?.data) {
+    throw new Error('La API no devolvió el pedido actualizado.')
+  }
+
+  return normalizarPedidoAdministrativo(respuesta.data)
+}
+
+export function normalizarEventoPedido(pedido) {
+  return normalizarPedidoAdministrativo(pedido)
+}
+
+export { API_URL, WS_URL }

@@ -4,7 +4,9 @@ export function colorEstado(estado) {
     case 'PENDIENTE':
       return 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20'
     case 'ASIGNADO':
+    case 'CONFIRMADO':
       return 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20'
+    case 'EN_PREPARACION':
     case 'EN_CAMINO':
       return 'bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/20'
     case 'ENTREGADO':
@@ -17,5 +19,5 @@ export function colorEstado(estado) {
 }
 
 export function etiquetaEstado(estado) {
-  return estado.replace('_', ' ')
+  return estado.replaceAll('_', ' ')
 }

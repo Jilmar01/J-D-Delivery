@@ -4,6 +4,7 @@ import Login from './Login'
 import EncabezadoApp from './components/EncabezadoApp'
 import PortalCliente from './components/PortalCliente'
 import PanelRepartidor from './components/PanelRepartidor'
+import PanelAdministrativo from './components/PanelAdministrativo'
 
 function VistaPorRol({ usuario }) {
   switch (usuario.rol) {
@@ -11,6 +12,8 @@ function VistaPorRol({ usuario }) {
       return <PortalCliente usuario={usuario} />
     case 'REPARTIDOR':
       return <PanelRepartidor usuario={usuario} />
+    case 'ADMIN':
+      return <PanelAdministrativo usuario={usuario} />
     default:
       return (
         <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
@@ -26,7 +29,20 @@ function VistaPorRol({ usuario }) {
 }
 
 function App() {
-  const [usuario, setUsuario] = useState(null)
+  const esDemoAdmin =
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get('demo') === 'admin'
+  const [usuario, setUsuario] = useState(() =>
+    esDemoAdmin
+      ? {
+          nombre: 'Administrador (demo)',
+          correo: 'demo@jd-delivery.local',
+          rol: 'ADMIN',
+          token: 'demo',
+          demo: true,
+        }
+      : null
+  )
 
   if (!usuario) {
     return <Login alIniciarSesion={setUsuario} />
