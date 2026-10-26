@@ -11,69 +11,61 @@ function FormularioPedido({
   setMensaje,
 }) {
   const estiloCampo =
-    'w-full rounded-xl border border-zinc-700 bg-[#09090B] px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
+    'w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-sm shadow-slate-200/50 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
 
   return (
     <section className="rounded-xl bg-transparent">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-white">
-          Registrar un pedido
-        </h2>
-
-        <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Completa los siguientes datos para solicitar una entrega.
-        </p>
-      </div>
-
       <form onSubmit={crearPedido} className="space-y-5">
-        <div>
-          <label
-            htmlFor="cliente"
-            className="mb-2 block text-sm font-medium text-zinc-200"
-          >
-            Nombre del cliente
-          </label>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="cliente"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Nombre del cliente
+            </label>
 
-          <input
-            id="cliente"
-            type="text"
-            value={cliente}
-            onChange={(e) => {
-              setCliente(e.target.value)
-              setMensaje('')
-            }}
-            placeholder="Ingresa tu nombre"
-            className={estiloCampo}
-            required
-          />
-        </div>
+            <input
+              id="cliente"
+              type="text"
+              value={cliente}
+              onChange={(e) => {
+                setCliente(e.target.value)
+                setMensaje('')
+              }}
+              placeholder="Ingresa tu nombre"
+              className={estiloCampo}
+              required
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="direccion"
-            className="mb-2 block text-sm font-medium text-zinc-200"
-          >
-            Dirección de entrega
-          </label>
+          <div>
+            <label
+              htmlFor="direccion"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Dirección de entrega
+            </label>
 
-          <input
-            id="direccion"
-            type="text"
-            value={direccion}
-            onChange={(e) => {
-              setDireccion(e.target.value)
-              setMensaje('')
-            }}
-            placeholder="Ej. Quito, sector centro"
-            className={estiloCampo}
-            required
-          />
+            <input
+              id="direccion"
+              type="text"
+              value={direccion}
+              onChange={(e) => {
+                setDireccion(e.target.value)
+                setMensaje('')
+              }}
+              placeholder="Ej. Quito, sector centro"
+              className={estiloCampo}
+              required
+            />
+          </div>
         </div>
 
         <div>
           <label
             htmlFor="descripcion"
-            className="mb-2 block text-sm font-medium text-zinc-200"
+            className="mb-2 block text-sm font-semibold text-slate-700"
           >
             Descripción del pedido
           </label>
@@ -87,15 +79,18 @@ function FormularioPedido({
             }}
             placeholder="Describe lo que deseas solicitar"
             rows={4}
-            className={`${estiloCampo} resize-y`}
+            className={`${estiloCampo} min-h-32 resize-y`}
             required
           />
         </div>
 
-        <div className="flex flex-col gap-4 pt-1 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-slate-500">
+            Revisa que la dirección y los detalles estén correctos.
+          </p>
           <button
             type="submit"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 active:scale-[0.99]"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/15 transition duration-200 hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-blue-900/20 focus:outline-none focus:ring-4 focus:ring-blue-600/20 active:scale-[0.99] sm:w-auto"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -119,7 +114,7 @@ function FormularioPedido({
         {mensaje && (
           <p
             role="status"
-            className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm font-medium text-emerald-400"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium leading-5 text-emerald-800"
           >
             {mensaje}
           </p>
