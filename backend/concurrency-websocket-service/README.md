@@ -46,3 +46,22 @@ Tus compañeros del frontend solo necesitan usar `socket.io-client` para conecta
 | `buy` | `{ unidadId, user }` | Notifica que el producto fue vendido. |
 | `cooldownBatch` | `{ comidaId, tiempoReposicion }` | Notifica que el lote de 5 se agotó (2 min de espera). |
 | `restocked` | `{ comidaId, unidades }` | Notifica que llegaron 5 nuevas unidades del producto. |
+
+
+---
+
+## 🗂️ Estructura
+```text
+concurrency-websocket-service/
+├── server.js        # Servidor Express + Socket.io
+├── src/
+│   └── client.js    # Lógica de cliente Socket.io para el Frontend
+├── package.json
+└── README.md
+```
+
+## ⚙️ Dónde se aplica la concurrencia
+- **Modelo**: un hilo con *event loop*; `io.on('connection')` en `server.js` atiende a todos los clientes a la vez.
+- **Exclusión sobre recursos compartidos**: `productos` es el estado global. En `reserve`, la comprobación `unidad.status === 'available'` y el cambio a `'reserved'` ocurren en el mismo turno del event loop (sin `await`), por lo que dos usuarios no pueden reservar la misma unidad. Si pierde, recibe `release`.
+- **Temporizadores concurrentes**: un `setTimeout` por reserva (libera a los 2 min) y otro por lote agotado (`verificarYReponerLote`, repone a los 2 min).
+- **Sincronización en tiempo real**: `io.emit(...)` difunde `reserve`, `release`, `buy`, `cooldownBatch` y `restocked` a todos los clientes conectados.

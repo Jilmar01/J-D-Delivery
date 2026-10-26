@@ -11,6 +11,7 @@ const HOST = process.env.TCP_HOST || 'localhost';
 
 const cliente = new net.Socket();
 
+// Crear rl para el ingreso y salida de datos
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout

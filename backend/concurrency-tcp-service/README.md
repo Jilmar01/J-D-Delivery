@@ -12,12 +12,11 @@ Servicio de comunicación en tiempo real mediante Sockets TCP nativos de Node.js
 ## Archivos del Módulo
 ```text
 concurrency-tcp-service/
-├── .env              # Variables de entorno locales
-├── .env.example      # Plantilla de variables de entorno
-├── client.js         # Cliente interactivo (Cliente / Repartidor)
+├── server.js         # Servidor TCP central
+├── src/
+│   └── client.js     # Cliente interactivo (Cliente / Repartidor)
 ├── package.json      # Configuración del paquete y scripts
-├── README.md         # Documentación del servicio
-└── server.js         # Servidor TCP central
+└── README.md         # Documentación del servicio
 ```
 
 ## Instrucciones de Ejecución
@@ -34,7 +33,7 @@ npm start
 ### 2. Conectar Clientes / Repartidores
 Abre una nueva terminal por cada participante:
 ```bash
-node client.js
+node src/client.js
 ```
 *O usando npm:*
 ```bash
@@ -50,3 +49,10 @@ Al iniciar el cliente, el sistema te solicitará:
 ### 3. Uso del Chat
 - Escribe tu mensaje y presiona `Enter` para enviarlo.
 - Para desconectarte limpiamente, escribe: `salir`.
+
+
+## Dónde se aplica la concurrencia
+- **Modelo**: un único hilo con *event loop* (I/O no bloqueante). `net.createServer` ejecuta el callback por cada conexión entrante, por lo que varios clientes se atienden simultáneamente (`server.js`, `net.createServer`).
+- **Estado compartido**: el `Map` `clientes` (socket → usuario) se actualiza en los eventos `data`, `close` y `error` de cada socket. Al no haber hilos, no hay condiciones de carrera.
+- **Broadcast**: la función `broadcast()` recorre los sockets conectados y escribe en cada uno con `socket.write`.
+- **Cliente** (`src/client.js`): `readline` (entrada de usuario) y `socket.on('data')` (mensajes entrantes) corren a la vez gracias a los eventos.
