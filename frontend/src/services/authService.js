@@ -1,5 +1,5 @@
 
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || ''
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://gph6pj52-3003.use2.devtunnels.ms'
 
 async function solicitarAuth(ruta, opciones) {
   try {
@@ -68,10 +68,10 @@ export async function registrarUsuario({ usuario, correo, contrasena, rol }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      usuario,
-      correo,
+      username: usuario,
+      email: correo,
       password: contrasena,
-      rol,
+      role: rol === 'CLIENTE' ? 'CUSTOMER' : 'DELIVERY_PERSON',
     }),
   })
 
@@ -92,7 +92,7 @@ export async function iniciarSesion(correo, contrasena) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      correo,
+      email: correo,
       password: contrasena,
     }),
   })
@@ -102,9 +102,12 @@ export async function iniciarSesion(correo, contrasena) {
     'No se pudo iniciar sesión. Verifica tus datos.'
   )
 
-  const usuario = datos.usuario || datos.data?.usuario || datos.data
+  const usuario =
+    datos.user || datos.usuario || datos.data?.user || datos.data?.usuario || datos.data
+  const rolRecibido = usuario?.rol || usuario?.role
+  const rolNormalizado = String(rolRecibido || '').trim().toUpperCase()
 
-  if (!usuario || !usuario.rol) {
+  if (!usuario || !rolRecibido) {
     throw new Error(
       'El servidor respondió, pero no se encontró el rol del usuario.'
     )
@@ -118,7 +121,14 @@ export async function iniciarSesion(correo, contrasena) {
 
   return {
     ...usuario,
-    rol: String(usuario.rol).trim().toUpperCase(),
+    nombre: usuario.nombre || usuario.username || '',
+    correo: usuario.correo || usuario.email || '',
+    rol:
+      rolNormalizado === 'CUSTOMER'
+        ? 'CLIENTE'
+        : rolNormalizado === 'DELIVERY_PERSON'
+          ? 'REPARTIDOR'
+          : rolNormalizado,
     token: datos.token,
   }
 }
