@@ -1,4 +1,21 @@
 
+export const ESTADOS_PROGRESO_PEDIDO = [
+  'PENDIENTE',
+  'ASIGNADO',
+  'EN_CAMINO',
+  'ENTREGADO',
+]
+
+export const SIGUIENTE_ESTADO_PEDIDO = {
+  PENDIENTE: 'ASIGNADO',
+  ASIGNADO: 'EN_CAMINO',
+  EN_CAMINO: 'ENTREGADO',
+}
+
+export function permiteTransicionPedido(estadoActual, nuevoEstado) {
+  return SIGUIENTE_ESTADO_PEDIDO[estadoActual] === nuevoEstado
+}
+
 export function colorEstado(estado) {
   switch (estado) {
     case 'PENDIENTE':

@@ -33,15 +33,36 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090B] text-zinc-100">
+    <div
+      className={`min-h-screen ${
+        usuario.rol === 'CLIENTE'
+          ? 'bg-slate-50 text-slate-900'
+          : 'bg-[#09090B] text-zinc-100'
+      }`}
+    >
       <EncabezadoApp
         usuario={usuario}
         alCerrarSesion={() => setUsuario(null)}
       />
 
+      {usuario.modoDemostracion && (
+        <p
+          role="status"
+          className="border-b border-amber-500/20 bg-amber-500/10 px-5 py-3 text-center text-sm text-amber-300"
+        >
+          Modo demostración local: los datos no se guardan en el backend.
+        </p>
+      )}
+
       <VistaPorRol usuario={usuario} />
 
-      <footer className="border-t border-white/10 px-5 py-6 text-center text-xs text-zinc-500">
+      <footer
+        className={`border-t px-5 py-6 text-center text-xs ${
+          usuario.rol === 'CLIENTE'
+            ? 'border-slate-200 bg-slate-50 text-slate-500'
+            : 'border-white/10 text-zinc-500'
+        }`}
+      >
         © {new Date().getFullYear()} J-D Delivery · Sistema distribuido de gestión de pedidos y entregas
       </footer>
     </div>

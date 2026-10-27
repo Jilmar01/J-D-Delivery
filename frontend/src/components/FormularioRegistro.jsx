@@ -16,8 +16,26 @@ function FormularioRegistro({ alRegistrar }) {
     e.preventDefault()
     setError('')
 
+    const usuario = nombre.trim()
+    const correoNormalizado = correo.trim().toLowerCase()
+
+    if (!usuario || !correoNormalizado || !contrasena) {
+      setError('Completa todos los campos.')
+      return
+    }
+
     if (contrasena !== confirmacion) {
       setError('Las contraseñas no coinciden.')
+      return
+    }
+
+    if (contrasena.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (!['CLIENTE', 'REPARTIDOR'].includes(rol)) {
+      setError('Selecciona un tipo de cuenta válido.')
       return
     }
 
@@ -25,13 +43,13 @@ function FormularioRegistro({ alRegistrar }) {
 
     try {
       await registrarUsuario({
-        nombre: nombre.trim(),
-        correo: correo.trim().toLowerCase(),
+        usuario,
+        correo: correoNormalizado,
         contrasena,
         rol,
       })
 
-      alRegistrar(correo.trim().toLowerCase())
+      alRegistrar(correoNormalizado)
     } catch (err) {
       setError(err.message || 'No se pudo crear la cuenta. Intenta nuevamente.')
     } finally {
@@ -40,7 +58,7 @@ function FormularioRegistro({ alRegistrar }) {
   }
 
   return (
-    <form onSubmit={registrar} className="space-y-5">
+    <form onSubmit={registrar} className="space-y-4 sm:space-y-5">
       <CampoFormulario
         id="nombre"
         etiqueta="Nombre completo"
@@ -101,7 +119,7 @@ function FormularioRegistro({ alRegistrar }) {
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+          className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm leading-5 text-red-300"
         >
           {error}
         </p>
@@ -110,7 +128,7 @@ function FormularioRegistro({ alRegistrar }) {
       <button
         type="submit"
         disabled={cargando}
-        className="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/50 transition duration-200 hover:-translate-y-0.5 hover:from-blue-500 hover:to-blue-400 hover:shadow-blue-900/50 focus:outline-none focus:ring-4 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
       >
         {cargando ? 'Creando cuenta...' : 'Crear cuenta'}
       </button>

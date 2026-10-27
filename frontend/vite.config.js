@@ -9,4 +9,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api/auth': {
+        target: 'https://gph6pj52-3003.use2.devtunnels.ms',
+        changeOrigin: true,
+      },
+    },
+  },
 })

@@ -1,16 +1,23 @@
-# React + Vite
+# J-D Delivery frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Selección de ubicación con OpenStreetMap
 
-Currently, two official plugins are available:
+El formulario usa Leaflet y OpenStreetMap para mostrar el mapa y permite buscar
+direcciones con el servicio público de Nominatim. No necesita una clave de
+Google ni variables de entorno. La ubicación elegida se conserva en el estado
+de la interfaz y no se agrega a la solicitud actual de pedidos.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Las búsquedas y consultas de dirección se ejecutan al enviar la búsqueda o
+seleccionar/mover un punto, no como autocompletado por cada pulsación. Las
+consultas se espacian para respetar el límite de uso del servicio público. El
+servicio puede limitarse o no estar disponible; en ese caso, la dirección
+manual del formulario sigue funcionando. OpenStreetMap requiere atribución,
+que se muestra junto al mapa.
 
-## React Compiler
+## Herramientas de React + Vite
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Este proyecto usa Vite para ejecutar React y ESLint para validar el código.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `npm run dev`: inicia el servidor de desarrollo.
+- `npm run lint`: ejecuta ESLint.
+- `npm run build`: genera el build de producción.
