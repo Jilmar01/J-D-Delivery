@@ -1,14 +1,8 @@
 // =============================================================================
 // OFERTAS DE PEDIDOS POR CERCANÍA - J&D DELIVERY
-//
 // La cercanía se mide contra el punto de SALIDA del pedido (lat/lng: el local donde
 // el repartidor debe recogerlo); el punto de entrega (entregaLat/entregaLng) solo se
 // reenvía en la oferta.
-//
-// Un pedido nuevo se ofrece a los N repartidores disponibles más cercanos
-// (broadcast). El primero que acepta intenta la asignación atómica en la base de
-// datos; la base decide al ganador. Si nadie acepta antes de `timeoutMs` o todos
-// rechazan, se ofrece a la siguiente ronda de más cercanos que aún no la vieron.
 // =============================================================================
 const { masCercanos } = require('./geo');
 const { serializar } = require('./protocolo');

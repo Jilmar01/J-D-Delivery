@@ -195,3 +195,43 @@ test('aceptar sin oferta vigente, ubicación sin registro y pedido sin repartido
         await cerrar(ctx);
     }
 });
+
+test('un repartidor ocupado no recibe ofertas hasta que envía disponible: true', async () => {
+    const ctx = await levantar({ maxKm: 10 });
+    const opts = { host: '127.0.0.1', port: ctx.port };
+    try {
+        const a = await repartidor(ctx, 1, cerca(0.5));
+
+        a.enviar({ tipo: 'ACTUALIZAR_UBICACION', repartidorId: 1, ...cerca(0.5), disponible: false });
+        await pausa(50);
+        const ocupado = await enviarMensaje({ tipo: 'NUEVO_PEDIDO', pedidoId: 60, ...PEDIDO }, opts);
+        assert.strictEqual(ocupado.tipo, 'SIN_REPARTIDORES');
+
+        a.enviar({ tipo: 'ACTUALIZAR_UBICACION', repartidorId: 1, ...cerca(0.5), disponible: true });
+        await pausa(50);
+        const libre = await enviarMensaje({ tipo: 'NUEVO_PEDIDO', pedidoId: 61, ...PEDIDO }, opts);
+        assert.strictEqual(libre.tipo, 'OFERTA_ENVIADA');
+        assert.strictEqual((await a.esperar('OFERTA_PEDIDO')).pedidoId, 61);
+    } finally {
+        await cerrar(ctx);
+    }
+});
+
+test('al moverse, la oferta pasa a ser para el repartidor que ahora está más cerca', async () => {
+    const ctx = await levantar({ nOfertas: 1, maxKm: 10 });
+    const opts = { host: '127.0.0.1', port: ctx.port };
+    try {
+        const a = await repartidor(ctx, 1, cerca(0.5));
+        const b = await repartidor(ctx, 2, cerca(3));
+
+        // B se acerca al local y A se aleja
+        a.enviar({ tipo: 'ACTUALIZAR_UBICACION', repartidorId: 1, ...cerca(5) });
+        b.enviar({ tipo: 'ACTUALIZAR_UBICACION', repartidorId: 2, ...cerca(0.2) });
+        await pausa(50);
+
+        const r = await enviarMensaje({ tipo: 'NUEVO_PEDIDO', pedidoId: 70, ...PEDIDO }, opts);
+        assert.deepStrictEqual(r.repartidores.map((x) => x.repartidorId), [2]);
+    } finally {
+        await cerrar(ctx);
+    }
+});

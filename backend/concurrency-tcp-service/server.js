@@ -138,13 +138,31 @@ module.exports = { crearServidor };
 
 if (require.main === module) {
     if (!process.env.DATABASE_URL) {
-        console.error('❌ Define DATABASE_URL (PostgreSQL de pedidos) antes de iniciar el servidor.');
+        console.error('❌ Define DATABASE_URL (PostgreSQL de delivery) antes de iniciar el servidor.');
+        console.error('   PowerShell: $env:DATABASE_URL = "postgresql://postgres:CLAVE@localhost:5432/delivery_delivery_db"');
         process.exit(1);
     }
     const store = crearStore(process.env.DATABASE_URL);
 
+    // Opcionales: cuántos repartidores reciben cada oferta, radio máximo y tiempo para responder
+    const numeroPositivo = (nombre) => {
+        if (process.env[nombre] === undefined) return undefined;
+        const valor = Number(process.env[nombre]);
+        if (!Number.isFinite(valor) || valor <= 0) {
+            console.error(`❌ ${nombre} debe ser un número mayor que cero (recibido: ${process.env[nombre]})`);
+            process.exit(1);
+        }
+        return valor;
+    };
+    const timeoutSeg = numeroPositivo('OFERTAS_TIMEOUT_SEG');
+    const opciones = Object.fromEntries(Object.entries({
+        nOfertas: numeroPositivo('OFERTAS_N'),
+        maxKm: numeroPositivo('OFERTAS_MAX_KM'),
+        timeoutMs: timeoutSeg === undefined ? undefined : timeoutSeg * 1000,
+    }).filter(([, valor]) => valor !== undefined));
+
     store.init().then(() => {
-        crearServidor({ store }).listen(PORT, HOST, () => {
+        crearServidor({ store, opciones }).listen(PORT, HOST, () => {
             console.log('========================================================');
             console.log(`🚀 Servidor TCP escuchando en ${HOST}:${PORT}`);
             console.log('========================================================\n');

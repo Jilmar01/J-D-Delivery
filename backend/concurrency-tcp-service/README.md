@@ -88,14 +88,30 @@ Se ejecutan contra PostgreSQL simulado (`pg-mem`) con el esquema de `delivery_db
 El repartidor es un proceso con la conexión TCP abierta. Se registra con su ubicación, y cuando llega un `NUEVO_PEDIDO` el servidor lo **ofrece a los 3 repartidores disponibles más cercanos** (radio 10 km). El primero que acepta intenta el `UPDATE` atómico; los demás reciben `PEDIDO_TOMADO`. Si nadie acepta en 15 s (o todos rechazan), se ofrece a los siguientes más cercanos. Los repartidores viven en memoria: si el servidor se reinicia deben reconectarse. La cercanía se mide contra el punto de **salida** del pedido (`lat`/`lng` de `NUEVO_PEDIDO`: el local); el punto de entrega (`entregaLat`/`entregaLng`) solo se reenvía en la oferta. Mensajes: ver `src/protocolo.js`.
 
 ```powershell
-# Terminal 1: servidor
+# Terminal 1: servidor (opcional: OFERTAS_N, OFERTAS_MAX_KM, OFERTAS_TIMEOUT_SEG)
 npm start
-# Terminales 2 y 3: repartidores (id, lat, lng); con --auto aceptan solos
-npm run repartidor -- 1 -0.1807 -78.4678
+# Terminales 2 y 3: repartidores (id, lat, lng)
+npm run repartidor -- 1 -0.1850 -78.4678 --mover
 npm run repartidor -- 2 -0.1900 -78.4700 --auto
 # Terminal 4: pedido nuevo (pedidoId, lat, lng, dirección)
 npm run enviar -- NUEVO_PEDIDO 1 -0.1810 -78.4680 "Quito, centro"   # lat/lng = salida (local)
 ```
+
+**Cliente del repartidor** (`npm run repartidor -- <id> <lat> <lng> [--auto] [--mover]`). Envía su posición cada 10 s.
+- `--auto`: acepta cada oferta a los 500 ms (para demostrar la concurrencia).
+- `--mover`: desplaza la posición ~50-100 m al azar en cada actualización.
+- Comandos por teclado: `a` / `r` (aceptar / rechazar la última oferta), `libre` / `ocupado`, `pos <lat> <lng>` (mover al repartidor) y `estado`. Al ganar un pedido queda ocupado hasta escribir `libre`.
+
+**Opciones del servidor** (variables de entorno, opcionales):
+
+| Variable | Por defecto | Efecto |
+|---|---|---|
+| `OFERTAS_N` | 3 | Cuántos repartidores reciben cada oferta (`1` = uno por uno, del más cercano al más lejano) |
+| `OFERTAS_MAX_KM` | 10 | Radio máximo desde el local |
+| `OFERTAS_TIMEOUT_SEG` | 15 | Tiempo para responder antes de pasar a los siguientes |
+
+**Demostración en varias PCs:** el servidor corre en una; en las demás, `$env:TCP_HOST = "<IP del servidor>"` y `npm run repartidor -- <id> <lat> <lng> --mover`.
+
 Pruebas: `test/cercania.test.js` (usa una base simulada en memoria).
 
 ## 5. Red con las cuatro computadoras (BE2-09)
