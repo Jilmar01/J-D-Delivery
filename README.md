@@ -15,6 +15,8 @@ Esta plataforma logística está construida sobre una arquitectura distribuida q
 
 El rol `ADMIN` dispone de una tabla de pedidos con filtros por estado, acciones para avanzar por las transiciones permitidas y actualización en tiempo real. El panel consulta `GET /api/pedidos`, cambia estados mediante `PATCH /api/pedidos/:id/estado` y escucha eventos WebSocket en `/ws`. El servicio publica `PEDIDO_CREADO` y `PEDIDO_ACTUALIZADO` después de guardar cada cambio en PostgreSQL.
 
+La tabla solicita los pedidos en bloques de 10 usando `limit` y `offset`; la API responde `total`, `limit`, `offset` y `data`. El endpoint limita cada petición a un máximo de 100 registros.
+
 ### Ejecución local
 
 Para ver los pedidos de la API sin configurar una cuenta administrativa, desde `frontend` ejecuta `npm run dev` y abre `http://localhost:5173/?demo=admin`. Esta vista previa consulta la API configurada en `URL_PEDIDOS`, pero los cambios de estado son solo locales. La URL sin `?demo=admin` solicita iniciar sesión con un usuario `ADMIN` y usa las rutas administrativas autenticadas.

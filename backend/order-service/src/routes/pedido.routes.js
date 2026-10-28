@@ -72,15 +72,38 @@ router.post("/", async (req, res) => {
 // GET /api/pedidos - Consultar todos los pedidos
 router.get("/", autorizarAdministrador, async (req, res) => {
   try {
-    const pedidos = await prisma.pedido.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const limite = Number(req.query.limit ?? 10);
+    const desplazamiento = Number(req.query.offset ?? 0);
+
+    if (
+      !Number.isSafeInteger(limite) ||
+      limite < 1 ||
+      limite > 100 ||
+      !Number.isSafeInteger(desplazamiento) ||
+      desplazamiento < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "limit debe estar entre 1 y 100 y offset debe ser un entero no negativo",
+      });
+    }
+
+    const [total, pedidos] = await prisma.$transaction([
+      prisma.pedido.count(),
+      prisma.pedido.findMany({
+        orderBy: {
+          createdAt: "desc",
+        },
+        skip: desplazamiento,
+        take: limite,
+      }),
+    ]);
 
     return res.status(200).json({
       success: true,
-      total: pedidos.length,
+      total,
+      limit: limite,
+      offset: desplazamiento,
       data: pedidos,
     });
   } catch (error) {

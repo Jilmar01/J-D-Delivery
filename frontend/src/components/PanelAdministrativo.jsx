@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import {
   cambiarEstadoAdministrativo,
   normalizarEventoPedido,
-  obtenerPedidosAdministrativos,
-  obtenerPedidosParaVistaPrevia,
+  obtenerPaginaPedidosAdministrativos,
+  obtenerPaginaPedidosParaVistaPrevia,
   WS_URL,
 } from '../services/pedidosService'
 import { colorEstado, etiquetaEstado } from '../utils/estados'
@@ -27,6 +27,7 @@ const TRANSICIONES = {
 }
 
 const FILTROS = ['TODOS', ...ESTADOS]
+const TAMANO_PAGINA = 10
 
 function mostrarTotal(total) {
   const valor = Number(total)
@@ -45,6 +46,10 @@ function PanelAdministrativo({ usuario }) {
   const [pedidos, setPedidos] = useState([])
   const [filtro, setFiltro] = useState('TODOS')
   const [cargando, setCargando] = useState(true)
+  const [cargandoMas, setCargandoMas] = useState(false)
+  const [totalPedidos, setTotalPedidos] = useState(null)
+  const [offsetSiguiente, setOffsetSiguiente] = useState(0)
+  const [hayMasPedidos, setHayMasPedidos] = useState(false)
   const [error, setError] = useState('')
   const [estadoSocket, setEstadoSocket] = useState(
     usuario.demo ? 'demo' : 'conectando'
@@ -62,12 +67,23 @@ function PanelAdministrativo({ usuario }) {
       const versionInicial = versionEventos
 
       try {
-        const datos = usuario.demo
-          ? await obtenerPedidosParaVistaPrevia()
-          : await obtenerPedidosAdministrativos(token)
+        const pagina = usuario.demo
+          ? await obtenerPaginaPedidosParaVistaPrevia(0, TAMANO_PAGINA)
+          : await obtenerPaginaPedidosAdministrativos(
+              token,
+              0,
+              TAMANO_PAGINA
+            )
 
         if (!desmontado && versionInicial === versionEventos) {
-          setPedidos(datos)
+          setPedidos(pagina.data)
+          setTotalPedidos(pagina.total)
+          setOffsetSiguiente(pagina.data.length)
+          setHayMasPedidos(
+            pagina.total === null
+              ? pagina.data.length === TAMANO_PAGINA
+              : pagina.data.length < pagina.total
+          )
           setError('')
         }
       } catch (err) {
@@ -123,6 +139,11 @@ function PanelAdministrativo({ usuario }) {
 
           const pedidoActualizado = normalizarEventoPedido(evento.datos)
           versionEventos += 1
+          if (evento.tipo === 'PEDIDO_CREADO') {
+            setTotalPedidos((total) =>
+              total === null ? null : total + 1
+            )
+          }
           setPedidos((anteriores) => {
             const yaExiste = anteriores.some(
               (pedido) => pedido.id === pedidoActualizado.id
@@ -169,15 +190,67 @@ function PanelAdministrativo({ usuario }) {
     setCargando(true)
 
     try {
-      const datos = usuario.demo
-        ? await obtenerPedidosParaVistaPrevia()
-        : await obtenerPedidosAdministrativos(usuario.token)
-      setPedidos(datos)
+      const pagina = usuario.demo
+        ? await obtenerPaginaPedidosParaVistaPrevia(0, TAMANO_PAGINA)
+        : await obtenerPaginaPedidosAdministrativos(
+            usuario.token,
+            0,
+            TAMANO_PAGINA
+          )
+      setPedidos(pagina.data)
+      setTotalPedidos(pagina.total)
+      setOffsetSiguiente(pagina.data.length)
+      setHayMasPedidos(
+        pagina.total === null
+          ? pagina.data.length === TAMANO_PAGINA
+          : pagina.data.length < pagina.total
+      )
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los pedidos.')
     } finally {
       setCargando(false)
+    }
+  }
+
+  async function cargarMasPedidos() {
+    if (cargandoMas) {
+      return
+    }
+
+    setCargandoMas(true)
+
+    try {
+      const pagina = usuario.demo
+        ? await obtenerPaginaPedidosParaVistaPrevia(
+            offsetSiguiente,
+            TAMANO_PAGINA
+          )
+        : await obtenerPaginaPedidosAdministrativos(
+            usuario.token,
+            offsetSiguiente,
+            TAMANO_PAGINA
+          )
+
+      setPedidos((anteriores) => {
+        const idsExistentes = new Set(anteriores.map((pedido) => pedido.id))
+        return [
+          ...anteriores,
+          ...pagina.data.filter((pedido) => !idsExistentes.has(pedido.id)),
+        ]
+      })
+      setOffsetSiguiente((offset) => offset + pagina.data.length)
+      if (pagina.total !== null) {
+        setTotalPedidos(pagina.total)
+        setHayMasPedidos(offsetSiguiente + pagina.data.length < pagina.total)
+      } else {
+        setHayMasPedidos(pagina.data.length === TAMANO_PAGINA)
+      }
+      setError('')
+    } catch (err) {
+      setError(err.message || 'No se pudieron cargar más pedidos.')
+    } finally {
+      setCargandoMas(false)
     }
   }
 
@@ -227,7 +300,6 @@ function PanelAdministrativo({ usuario }) {
       ['CONFIRMADO', 'EN_PREPARACION', 'EN_CAMINO'].includes(pedido.estado)
   )
   const entregados = pedidos.filter((pedido) => pedido.estado === 'ENTREGADO')
-
   return (
     <main className="mx-auto max-w-7xl space-y-7 px-5 py-8 sm:px-8 sm:py-10">
       <section className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gradient-to-r from-purple-950/60 via-[#18151f] to-[#15151A] p-6 sm:p-8">
@@ -283,10 +355,13 @@ function PanelAdministrativo({ usuario }) {
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         {[
-          { etiqueta: 'Total de pedidos', valor: pedidos.length },
-          { etiqueta: 'Pendientes', valor: pendientes.length },
-          { etiqueta: 'En proceso', valor: enProceso.length },
-          { etiqueta: 'Entregados', valor: entregados.length },
+          {
+            etiqueta: 'Total de pedidos',
+            valor: totalPedidos ?? pedidos.length,
+          },
+          { etiqueta: 'Pendientes cargados', valor: pendientes.length },
+          { etiqueta: 'En proceso cargados', valor: enProceso.length },
+          { etiqueta: 'Entregados cargados', valor: entregados.length },
         ].map((dato) => (
           <article
             key={dato.etiqueta}
@@ -338,7 +413,7 @@ function PanelAdministrativo({ usuario }) {
             <button
               type="button"
               onClick={recargarPedidos}
-              disabled={cargando}
+              disabled={cargando || cargandoMas}
               className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-purple-500/50 hover:text-white disabled:cursor-wait disabled:opacity-60"
             >
               {cargando ? 'Cargando…' : 'Actualizar'}
@@ -453,11 +528,25 @@ function PanelAdministrativo({ usuario }) {
         </div>
 
         <div className="border-t border-white/10 px-5 py-3 text-xs text-zinc-500 sm:px-7">
-          Mostrando {pedidosVisibles.length} de {pedidos.length} pedidos · Los
+          Mostrando {pedidosVisibles.length} pedidos cargados
+          {totalPedidos !== null ? ` de ${totalPedidos}` : ''} · Los
           {usuario.demo
             ? ' cambios de estado son solo locales en esta vista previa.'
             : ' cambios de estado se guardan en la API.'}
         </div>
+
+        {hayMasPedidos && (
+          <div className="flex justify-center border-t border-white/10 px-5 py-4">
+            <button
+              type="button"
+              onClick={cargarMasPedidos}
+              disabled={cargandoMas || cargando}
+              className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-5 py-2.5 text-sm font-semibold text-purple-200 transition hover:border-purple-400/60 hover:bg-purple-500/20 disabled:cursor-wait disabled:opacity-60"
+            >
+              {cargandoMas ? 'Cargando pedidos…' : 'Cargar 10 pedidos más'}
+            </button>
+          </div>
+        )}
       </section>
     </main>
   )

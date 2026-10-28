@@ -6,6 +6,7 @@ const API_URL = import.meta.env.DEV
       import.meta.env.VITE_API_URL ||
       'http://localhost:3001'
     ).replace(/\/$/, '')
+//
 const WS_URL =
   import.meta.env.VITE_WS_URL ||
   (import.meta.env.DEV
@@ -109,18 +110,18 @@ async function solicitarPedidos(ruta, token, opciones = {}) {
   return datos
 }
 
-export async function obtenerPedidosAdministrativos(token) {
-  const respuesta = await solicitarPedidos('/api/pedidos', token)
-
-  if (!Array.isArray(respuesta?.data)) {
-    throw new Error('La API no devolvió una lista válida de pedidos.')
-  }
-
-  return respuesta.data.map(normalizarPedidoAdministrativo)
-}
-
-export async function obtenerPedidosParaVistaPrevia() {
-  const respuesta = await fetch(`${API_URL}/api/pedidos`)
+async function obtenerPaginaPedidos(ruta, token, offset, limite) {
+  const separador = ruta.includes('?') ? '&' : '?'
+  const respuesta = await fetch(
+    `${API_URL}${ruta}${separador}limit=${limite}&offset=${offset}`,
+    token
+      ? {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      : undefined
+  )
   const datos = await respuesta.json().catch(() => null)
 
   if (!respuesta.ok) {
@@ -133,12 +134,55 @@ export async function obtenerPedidosParaVistaPrevia() {
     throw new Error('La API no devolvió una lista válida de pedidos.')
   }
 
-  return datos.data.map(normalizarPedidoAdministrativo)
+  const total = Number.isSafeInteger(Number(datos.total))
+    ? Number(datos.total)
+    : null
+  const respuestaYaPaginada =
+    datos.offset !== undefined &&
+    datos.limit !== undefined &&
+    Number(datos.offset) === offset &&
+    Number(datos.limit) === limite
+  const respuestaCompleta =
+    total !== null && total === datos.data.length
+  const respuestaPaginada =
+    respuestaYaPaginada
+      ? datos.data
+      : respuestaCompleta || datos.data.length > limite
+        ? datos.data.slice(offset, offset + limite)
+        : datos.data
+
+  return {
+    data: respuestaPaginada.map(normalizarPedidoAdministrativo),
+    total,
+  }
+}
+
+export async function obtenerPaginaPedidosAdministrativos(
+  token,
+  offset,
+  limite
+) {
+  if (!token) {
+    throw new Error('La sesión administrativa expiró. Inicia sesión nuevamente.')
+  }
+
+  const pagina = await obtenerPaginaPedidos(
+    '/api/orders',
+    token,
+    offset,
+    limite
+  )
+
+  return pagina
+}
+
+export async function obtenerPaginaPedidosParaVistaPrevia(offset, limite) {
+  return obtenerPaginaPedidos('/api/orders', undefined, offset, limite)
 }
 
 export async function cambiarEstadoAdministrativo(id, estado, token) {
   const respuesta = await solicitarPedidos(
-    `/api/pedidos/${id}/estado`,
+    `/api/orders/${id}/estado`,
     token,
     {
       method: 'PATCH',
