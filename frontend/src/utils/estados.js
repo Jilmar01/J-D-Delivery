@@ -1,32 +1,25 @@
 
 export const ESTADOS_PROGRESO_PEDIDO = [
-  'PENDIENTE',
-  'ASIGNADO',
-  'EN_CAMINO',
-  'ENTREGADO',
+  'PENDING',
+  'CONFIRMED',
+  'PREPARING',
+  'IN_TRANSIT',
+  'DELIVERED',
 ]
-
-export const SIGUIENTE_ESTADO_PEDIDO = {
-  PENDIENTE: 'ASIGNADO',
-  ASIGNADO: 'EN_CAMINO',
-  EN_CAMINO: 'ENTREGADO',
-}
-
-export function permiteTransicionPedido(estadoActual, nuevoEstado) {
-  return SIGUIENTE_ESTADO_PEDIDO[estadoActual] === nuevoEstado
-}
 
 export function colorEstado(estado) {
   switch (estado) {
-    case 'PENDIENTE':
+    case 'PENDING':
       return 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20'
-    case 'ASIGNADO':
+    case 'CONFIRMED':
       return 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20'
-    case 'EN_CAMINO':
+    case 'PREPARING':
+      return 'bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20'
+    case 'IN_TRANSIT':
       return 'bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/20'
-    case 'ENTREGADO':
+    case 'DELIVERED':
       return 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
-    case 'CANCELADO':
+    case 'CANCELLED':
       return 'bg-red-500/10 text-red-400 ring-1 ring-red-500/20'
     default:
       return 'bg-zinc-700 text-zinc-300'
@@ -34,5 +27,14 @@ export function colorEstado(estado) {
 }
 
 export function etiquetaEstado(estado) {
-  return estado.replace('_', ' ')
+  const etiquetas = {
+    PENDING: 'Pendiente',
+    CONFIRMED: 'Confirmado',
+    PREPARING: 'En preparación',
+    IN_TRANSIT: 'En camino',
+    DELIVERED: 'Entregado',
+    CANCELLED: 'Cancelado',
+  }
+
+  return etiquetas[estado] || estado || 'Estado no disponible'
 }

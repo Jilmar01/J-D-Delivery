@@ -54,8 +54,16 @@ export async function registrarUsuario({ usuario, correo, contrasena, rol }) {
     throw new Error('Completa todos los campos.')
   }
 
-  if (contrasena.length < 6) {
-    throw new Error('La contraseña debe tener al menos 6 caracteres.')
+  if (contrasena.length < 8) {
+    throw new Error('La contraseña debe tener al menos 8 caracteres.')
+  }
+
+  if (new TextEncoder().encode(contrasena).length > 72) {
+    throw new Error('La contraseña no puede superar 72 bytes.')
+  }
+
+  if (usuario.trim().length < 3 || usuario.trim().length > 50) {
+    throw new Error('El nombre debe tener entre 3 y 50 caracteres.')
   }
 
   if (!['CLIENTE', 'REPARTIDOR'].includes(rol)) {

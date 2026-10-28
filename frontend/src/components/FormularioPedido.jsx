@@ -22,8 +22,6 @@ function FormularioPedido({
   setDeliveryLng,
   confirmarUbicacion,
   crearPedido,
-  registrarPedidoPrueba,
-  registrandoPedidoPrueba,
   mensaje,
 }) {
   const estiloCampo =
@@ -237,26 +235,19 @@ function FormularioPedido({
               Preparar pedido de demostración
             </button>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div
+            role="status"
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4"
+          >
             <p className="text-sm font-semibold text-amber-900">
-              Prueba temporal del backend
+              Registro real todavía no disponible
             </p>
             <p className="mt-1 text-xs leading-5 text-amber-800">
-              Envía customerId y productos de prueba; usa la dirección, notas y
-              coordenadas actuales del formulario. No utiliza el carrito demo y
-              puede crear un registro de prueba en la base de datos.
+              El catálogo y sus IDs reales aún no están conectados, y el
+              customerId de esta cuenta debe confirmarse con el backend. El
+              botón superior solo prepara un borrador local; no envía ni guarda
+              un pedido.
             </p>
-            <button
-              type="button"
-              onClick={registrarPedidoPrueba}
-              disabled={registrandoPedidoPrueba}
-              aria-busy={registrandoPedidoPrueba}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-700 bg-white px-5 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 focus:outline-none focus:ring-4 focus:ring-amber-600/20 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              {registrandoPedidoPrueba
-                ? 'Enviando pedido de prueba...'
-                : 'Enviar pedido de prueba al backend'}
-            </button>
           </div>
         </div>
 

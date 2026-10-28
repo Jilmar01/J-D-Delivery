@@ -1,16 +1,20 @@
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import Login from './Login'
 import EncabezadoApp from './components/EncabezadoApp'
 import PortalCliente from './components/PortalCliente'
 import PanelRepartidor from './components/PanelRepartidor'
 
-function VistaPorRol({ usuario }) {
+function VistaPorRol({ usuario, alCerrarSesion }) {
   switch (usuario.rol) {
     case 'CLIENTE':
-      return <PortalCliente usuario={usuario} />
+      return (
+        <PortalCliente usuario={usuario} alCerrarSesion={alCerrarSesion} />
+      )
     case 'REPARTIDOR':
-      return <PanelRepartidor usuario={usuario} />
+      return (
+        <PanelRepartidor usuario={usuario} alCerrarSesion={alCerrarSesion} />
+      )
     default:
       return (
         <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
@@ -27,9 +31,25 @@ function VistaPorRol({ usuario }) {
 
 function App() {
   const [usuario, setUsuario] = useState(null)
+  const [mensajeSesion, setMensajeSesion] = useState('')
+
+  const alCerrarSesionPorExpiracion = useCallback((mensaje) => {
+    setMensajeSesion(
+      mensaje || 'La sesión expiró. Inicia sesión nuevamente.'
+    )
+    setUsuario(null)
+  }, [])
 
   if (!usuario) {
-    return <Login alIniciarSesion={setUsuario} />
+    return (
+      <Login
+        avisoSesion={mensajeSesion}
+        alIniciarSesion={(usuarioAutenticado) => {
+          setMensajeSesion('')
+          setUsuario(usuarioAutenticado)
+        }}
+      />
+    )
   }
 
   return (
@@ -42,7 +62,10 @@ function App() {
     >
       <EncabezadoApp
         usuario={usuario}
-        alCerrarSesion={() => setUsuario(null)}
+        alCerrarSesion={() => {
+          setMensajeSesion('')
+          setUsuario(null)
+        }}
       />
 
       {usuario.modoDemostracion && (
@@ -54,7 +77,10 @@ function App() {
         </p>
       )}
 
-      <VistaPorRol usuario={usuario} />
+      <VistaPorRol
+        usuario={usuario}
+        alCerrarSesion={alCerrarSesionPorExpiracion}
+      />
 
       <footer
         className={`border-t px-5 py-6 text-center text-xs ${

@@ -4,7 +4,7 @@ import { iniciarSesion as autenticarUsuario } from './services/authService'
 import CampoFormulario from './components/CampoFormulario'
 import FormularioRegistro from './components/FormularioRegistro'
 
-function Login({ alIniciarSesion }) {
+function Login({ alIniciarSesion, avisoSesion }) {
   const [modo, setModo] = useState('login')
   const [aviso, setAviso] = useState('')
   const [correo, setCorreo] = useState('')
@@ -249,6 +249,15 @@ function Login({ alIniciarSesion }) {
                     }
                     required
                   />
+
+                  {avisoSesion && (
+                    <p
+                      role="alert"
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+                    >
+                      {avisoSesion}
+                    </p>
+                  )}
 
                   {aviso && (
                     <p

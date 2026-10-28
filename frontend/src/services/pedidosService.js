@@ -1,154 +1,42 @@
+const API_URL =
+  import.meta.env.VITE_ORDERS_API_URL ||
+  import.meta.env.VITE_API_URL ||
+  'https://gph6pj52-3001.use2.devtunnels.ms'
 
-import { permiteTransicionPedido } from '../utils/estados'
-
-const API_URL = 'https://gph6pj52-3001.use2.devtunnels.ms'
 const PEDIDOS_API_URL = `${API_URL.replace(/\/+$/, '')}/api/orders`
 
-const pedidosSimulados = []
-const propietariosPedidosSimulados = new Map()
-
-export async function obtenerPedidos() {
-  const respuesta = await solicitarPedidos(PEDIDOS_API_URL, {
-    method: 'GET',
-  })
-  const resultado = await leerRespuestaPedidos(respuesta)
-
-  if (!Array.isArray(resultado.data)) {
-    throw new Error(
-      'El servicio de pedidos devolvió una respuesta inválida: se esperaba una lista en data.'
-    )
-  }
-
-  return resultado.data
+function crearError(mensaje, status, causa) {
+  const error = new Error(mensaje, causa ? { cause: causa } : undefined)
+  if (status !== undefined) error.status = status
+  return error
 }
 
-export async function obtenerPedidosCliente(customerId) {
-  if (typeof customerId !== 'string' || !customerId.trim()) {
+function validarToken(token) {
+  if (typeof token !== 'string' || !token.trim()) {
     throw new Error(
-      'No se pueden consultar los pedidos: falta el customerId real del usuario.'
+      'No hay un token de sesión disponible. Inicia sesión nuevamente.'
     )
   }
 
-  const pedidos = await obtenerPedidos()
-  return pedidos.filter((pedido) => pedido.customerId === customerId.trim())
+  return token.trim()
 }
 
-export async function crearPedido(datosPedido = {}) {
-  const customerId = datosPedido.customerId
-  const deliveryAddress = datosPedido.deliveryAddress
-  const notes = datosPedido.notes ?? ''
-  const deliveryLat = Number(datosPedido.deliveryLat)
-  const deliveryLng = Number(datosPedido.deliveryLng)
-  const total = Number(datosPedido.total)
-  const items = datosPedido.items
-
-  if (typeof customerId !== 'string' || !customerId.trim()) {
-    throw new Error(
-      'No se puede registrar el pedido: falta el identificador real del cliente (customerId).'
-    )
-  }
-
-  if (typeof deliveryAddress !== 'string' || !deliveryAddress.trim()) {
-    throw new Error('No se puede registrar el pedido: falta la dirección de entrega.')
-  }
-
-  if (typeof notes !== 'string') {
-    throw new Error('No se puede registrar el pedido: las notas deben ser texto.')
-  }
-
-  if (
-    !Number.isFinite(deliveryLat) ||
-    deliveryLat < -90 ||
-    deliveryLat > 90 ||
-    !Number.isFinite(deliveryLng) ||
-    deliveryLng < -180 ||
-    deliveryLng > 180
-  ) {
-    throw new Error(
-      'No se puede registrar el pedido: selecciona una ubicación válida con latitud y longitud.'
-    )
-  }
-
-  if (!Number.isFinite(total) || total <= 0) {
-    throw new Error('No se puede registrar el pedido: falta un total válido.')
-  }
-
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new Error(
-      'No se puede registrar el pedido: agrega los productos y sus precios antes de enviarlo.'
-    )
-  }
-
-  const itemsValidos = items.every(
-    (item) =>
-      item &&
-      item.idLocalDemo === undefined &&
-      item.unitPriceDemo === undefined &&
-      item.productId !== undefined &&
-      !(typeof item.productId === 'string' && item.productId.startsWith('demo-')) &&
-      typeof item.productName === 'string' &&
-      item.productName.trim() &&
-      Number.isInteger(Number(item.quantity)) &&
-      Number(item.quantity) > 0 &&
-      Number.isFinite(Number(item.unitPrice)) &&
-      Number(item.unitPrice) >= 0
-  )
-
-  if (!itemsValidos) {
-    throw new Error(
-      'No se puede registrar el pedido: cada producto debe incluir identificador, nombre, cantidad y precio unitario válidos.'
-    )
-  }
-
-  const cuerpo = {
-    customerId: customerId.trim(),
-    deliveryAddress: deliveryAddress.trim(),
-    deliveryLat,
-    deliveryLng,
-    notes,
-    total,
-    items: items.map((item) => ({
-      productId: item.productId,
-      productName: item.productName.trim(),
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice),
-    })),
-  }
-
-  const respuesta = await solicitarPedidos(PEDIDOS_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-  })
-  const resultado = await leerRespuestaPedidos(respuesta)
-
-  if (!resultado.data || typeof resultado.data !== 'object') {
-    throw new Error(
-      'El servicio de pedidos respondió correctamente, pero no devolvió los datos del pedido.'
-    )
-  }
-
-  const pedido = resultado.data
+function encabezadosAutenticados(token, incluirJson = false) {
   return {
-    ...pedido,
-    cliente: datosPedido.cliente || pedido.customerId,
-    direccion: pedido.deliveryAddress,
-    descripcion: pedido.notes,
-    estado: pedido.status,
-    fecha: pedido.createdAt
-      ? new Date(pedido.createdAt).toLocaleDateString('es-EC')
-      : '',
+    Authorization: `Bearer ${validarToken(token)}`,
+    ...(incluirJson ? { 'Content-Type': 'application/json' } : {}),
   }
 }
 
-async function solicitarPedidos(url, opciones) {
+async function solicitarPedidos(opciones) {
   try {
-    return await fetch(url, opciones)
+    return await fetch(PEDIDOS_API_URL, opciones)
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error(
-        'No se pudo conectar con el servicio de pedidos. Verifica que el backend esté activo y que la URL de la API sea correcta.',
-        { cause: error }
+      throw crearError(
+        'No se pudo conectar con el servicio de pedidos. Verifica que el backend esté activo y que la URL sea correcta.',
+        undefined,
+        error
       )
     }
 
@@ -158,53 +46,212 @@ async function solicitarPedidos(url, opciones) {
 
 async function leerRespuestaPedidos(respuesta) {
   let resultado
+
   try {
     resultado = await respuesta.json()
   } catch (error) {
-    if (!respuesta.ok) {
-      throw new Error(
-        `El servicio de pedidos respondió con un error (HTTP ${respuesta.status}) y un cuerpo inválido.`,
-        { cause: error }
-      )
-    }
-
-    throw new Error('El servicio de pedidos devolvió una respuesta inválida.', {
-      cause: error,
-    })
+    throw crearError(
+      respuesta.ok
+        ? 'El servicio de pedidos devolvió una respuesta inválida.'
+        : `La solicitud falló (HTTP ${respuesta.status}) y el servidor no devolvió JSON válido.`,
+      respuesta.status,
+      error
+    )
   }
 
-  if (!resultado || typeof resultado !== 'object' || Array.isArray(resultado)) {
-    throw new Error(
-      'El servicio de pedidos devolvió una respuesta inválida: se esperaba un objeto JSON.'
+  if (
+    !resultado ||
+    typeof resultado !== 'object' ||
+    Array.isArray(resultado)
+  ) {
+    throw crearError(
+      'El servicio de pedidos devolvió una respuesta JSON inválida.',
+      respuesta.status
     )
   }
 
   if (!respuesta.ok || resultado.success === false) {
-    throw new Error(
-      resultado.message ||
-        `La solicitud al servicio de pedidos falló (HTTP ${respuesta.status}).`
-    )
+    const mensaje =
+      respuesta.status === 401
+        ? 'La sesión expiró o el token no es válido. Inicia sesión nuevamente.'
+        : respuesta.status === 403
+          ? 'No tienes permiso para realizar esta operación.'
+          : resultado.message ||
+            `La solicitud al servicio de pedidos falló (HTTP ${respuesta.status}).`
+
+    throw crearError(mensaje, respuesta.status)
   }
 
   return resultado
 }
 
-export async function actualizarEstadoPedido(id, estado) {
-  const pedido = pedidosSimulados.find((p) => p.id === id)
-
-  if (!pedido) {
-    throw new Error('Pedido no encontrado.')
+function normalizarPedido(pedido) {
+  if (!pedido || typeof pedido !== 'object' || Array.isArray(pedido)) {
+    throw new Error('El servicio devolvió un pedido con formato inválido.')
   }
 
-  if (!permiteTransicionPedido(pedido.estado, estado)) {
+  return {
+    ...pedido,
+    cliente:
+      pedido.customer?.username ||
+      pedido.customer?.name ||
+      pedido.cliente ||
+      '',
+    direccion: pedido.deliveryAddress ?? pedido.direccion ?? '',
+    descripcion: pedido.notes ?? pedido.descripcion ?? '',
+    estado: pedido.status ?? pedido.estado,
+    fecha: pedido.createdAt
+      ? new Date(pedido.createdAt).toLocaleDateString('es-EC')
+      : pedido.fecha || '',
+  }
+}
+
+function extraerListaPedidos(resultado) {
+  if (!Array.isArray(resultado.data)) {
     throw new Error(
-      `Transición de estado no permitida: ${pedido.estado} → ${estado}.`
+      'La respuesta del backend no contiene la lista de pedidos esperada en data.'
     )
   }
 
-  pedido.estado = estado
+  return resultado.data.map(normalizarPedido)
+}
 
-  return { ...pedido }
+function extraerPedidoCreado(resultado) {
+  if (
+    !resultado.data ||
+    typeof resultado.data !== 'object' ||
+    Array.isArray(resultado.data) ||
+    resultado.data.id === undefined ||
+    resultado.data.id === null
+  ) {
+    throw new Error(
+      'El backend no confirmó la creación con los datos e ID del pedido.'
+    )
+  }
+
+  return normalizarPedido(resultado.data)
+}
+
+/**
+ * Obtiene los pedidos del endpoint configurado usando el token de sesión.
+ */
+export async function obtenerPedidos(token) {
+  const respuesta = await solicitarPedidos({
+    method: 'GET',
+    headers: encabezadosAutenticados(token),
+  })
+
+  return extraerListaPedidos(await leerRespuestaPedidos(respuesta))
+}
+
+/**
+ * Filtra la lista por el customerId real confirmado para la cuenta.
+ */
+export async function obtenerPedidosCliente(customerId, token) {
+  if (typeof customerId !== 'string' || !customerId.trim()) {
+    throw new Error(
+      'No se pueden consultar los pedidos: falta el customerId real de la cuenta.'
+    )
+  }
+
+  const pedidos = await obtenerPedidos(token)
+
+  return pedidos.filter(
+    (pedido) => String(pedido.customerId) === customerId.trim()
+  )
+}
+
+/**
+ * Envía únicamente los campos aceptados por el handler actual de creación.
+ * La API de pedidos no declara campos para coordenadas.
+ */
+export async function crearPedido(datosPedido = {}, token) {
+  const tokenValidado = validarToken(token)
+  const {
+    customerId,
+    deliveryAddress,
+    notes = '',
+    total,
+    items,
+  } = datosPedido
+
+  if (typeof customerId !== 'string' || !customerId.trim()) {
+    throw new Error(
+      'No se puede registrar el pedido: falta el customerId real de la cuenta.'
+    )
+  }
+
+  if (typeof deliveryAddress !== 'string' || !deliveryAddress.trim()) {
+    throw new Error(
+      'No se puede registrar el pedido: falta la dirección de entrega.'
+    )
+  }
+
+  if (typeof notes !== 'string') {
+    throw new Error('Las notas del pedido deben ser texto.')
+  }
+
+  const totalNumerico = Number(total)
+  if (!Number.isFinite(totalNumerico) || totalNumerico <= 0) {
+    throw new Error('El total del pedido debe ser mayor que cero.')
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('Agrega productos del catálogo real antes de enviar.')
+  }
+
+  const itemsValidos = items.every(
+    (item) =>
+      item &&
+      item.idLocalDemo === undefined &&
+      item.unitPriceDemo === undefined &&
+      Number.isSafeInteger(item.productId) &&
+      item.productId > 0 &&
+      typeof item.productName === 'string' &&
+      item.productName.trim() &&
+      Number.isInteger(item.quantity) &&
+      item.quantity > 0 &&
+      Number.isFinite(Number(item.unitPrice)) &&
+      Number(item.unitPrice) > 0
+  )
+
+  if (!itemsValidos) {
+    throw new Error(
+      'Cada producto debe tener un ID entero real, nombre, cantidad y precio unitario válidos.'
+    )
+  }
+
+  const totalCalculado = items.reduce(
+    (suma, item) => suma + Number(item.unitPrice) * item.quantity,
+    0
+  )
+
+  if (Math.abs(totalCalculado - totalNumerico) > 0.01) {
+    throw new Error(
+      'El total no coincide con la suma de los productos del pedido.'
+    )
+  }
+
+  const cuerpo = {
+    customerId: customerId.trim(),
+    deliveryAddress: deliveryAddress.trim(),
+    notes: notes.trim(),
+    total: totalNumerico,
+    items: items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName.trim(),
+      quantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+    })),
+  }
+
+  const respuesta = await solicitarPedidos({
+    method: 'POST',
+    headers: encabezadosAutenticados(tokenValidado, true),
+    body: JSON.stringify(cuerpo),
+  })
+
+  return extraerPedidoCreado(await leerRespuestaPedidos(respuesta))
 }
 
 export { API_URL }

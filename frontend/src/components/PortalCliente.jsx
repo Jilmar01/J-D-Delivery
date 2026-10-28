@@ -1,11 +1,8 @@
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import FormularioPedido from './FormularioPedido'
 import ListaPedidos from './ListaPedidos'
-import {
-  obtenerPedidosCliente,
-  crearPedido as guardarPedido,
-} from '../services/pedidosService'
+import { obtenerPedidosCliente } from '../services/pedidosService'
 import pizza from '../assets/images/pizza.jpg'
 import hamburguesa from '../assets/images/hamburguesa.jpg'
 import sushi from '../assets/images/sushi.jpg'
@@ -58,33 +55,6 @@ const COMIDAS_DEMO = [
     alt: 'Fotografía de referencia de ensalada',
   },
 ]
-
-const PEDIDO_PRUEBA_BACKEND = {
-  customerId: 'customer-003',
-  deliveryAddress: 'Calle Bolívar y 10 de Agosto, Loja',
-  notes: 'Entregar en la puerta principal',
-  total: 36.5,
-  items: [
-    {
-      productId: 1,
-      productName: 'Hamburguesa doble',
-      quantity: 2,
-      unitPrice: 12.5,
-    },
-    {
-      productId: 2,
-      productName: 'Papas fritas grandes',
-      quantity: 1,
-      unitPrice: 6.5,
-    },
-    {
-      productId: 3,
-      productName: 'Gaseosa',
-      quantity: 1,
-      unitPrice: 5,
-    },
-  ],
-}
 
 const formatoMoneda = new Intl.NumberFormat('es-EC', {
   style: 'currency',
@@ -148,11 +118,10 @@ function IconoCategoria({ tipo }) {
   )
 }
 
-function PortalCliente({ usuario }) {
+function PortalCliente({ usuario, alCerrarSesion }) {
   const [pedidos, setPedidos] = useState([])
   const [cantidadesCarrito, setCantidadesCarrito] = useState({})
   const [pedidoBorradorDemo, setPedidoBorradorDemo] = useState(null)
-  const [registrandoPedidoPrueba, setRegistrandoPedidoPrueba] = useState(false)
   const [cliente, setCliente] = useState(usuario.nombre || '')
   const [direccion, setDireccion] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -163,7 +132,6 @@ function PortalCliente({ usuario }) {
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
-  const envioPruebaEnCurso = useRef(false)
 
   function cambiarCantidad(comida, cambio) {
     alEditarPedido()
@@ -199,19 +167,56 @@ function PortalCliente({ usuario }) {
   }
 
   useEffect(() => {
+    let cancelado = false
+
     async function cargarPedidos() {
-      try {
-        const datos = await obtenerPedidosCliente(usuario.customerId)
-        setPedidos(datos)
-      } catch {
-        setError('No se pudieron cargar los pedidos. Verifica tu identificador de cliente.')
-      } finally {
+      if (usuario.modoDemostracion) {
         setCargando(false)
+        return
+      }
+
+      if (!usuario.token) {
+        setError('No hay una sesión autenticada para consultar pedidos.')
+        setCargando(false)
+        return
+      }
+
+      if (typeof usuario.customerId !== 'string' || !usuario.customerId.trim()) {
+        setError(
+          'La cuenta autenticada no incluye un customerId confirmado. No se consultaron pedidos.'
+        )
+        setCargando(false)
+        return
+      }
+
+      try {
+        const datos = await obtenerPedidosCliente(
+          usuario.customerId,
+          usuario.token
+        )
+        if (cancelado) return
+        setPedidos(datos)
+      } catch (error) {
+        if (cancelado) return
+        setError(error.message || 'No se pudieron cargar los pedidos.')
+        if (error.status === 401) {
+          alCerrarSesion(error.message)
+        }
+      } finally {
+        if (!cancelado) setCargando(false)
       }
     }
 
     cargarPedidos()
-  }, [usuario.customerId])
+    return () => {
+      cancelado = true
+    }
+  }, [
+    alCerrarSesion,
+    usuario.customerId,
+    usuario.modoDemostracion,
+    usuario.token,
+  ])
 
   function crearPedido(e) {
     e.preventDefault()
@@ -256,59 +261,6 @@ function PortalCliente({ usuario }) {
     setMensaje(
       'Borrador de demostración preparado. No se envió ni se registró ningún pedido.'
     )
-  }
-
-  async function registrarPedidoPrueba() {
-    if (envioPruebaEnCurso.current) return
-
-    if (!direccion.trim()) {
-      setError('Completa la dirección de entrega antes de enviar la prueba.')
-      return
-    }
-
-    if (
-      !Number.isFinite(deliveryLat) ||
-      deliveryLat < -90 ||
-      deliveryLat > 90 ||
-      !Number.isFinite(deliveryLng) ||
-      deliveryLng < -180 ||
-      deliveryLng > 180
-    ) {
-      setError(
-        'Selecciona una ubicación válida en el mapa antes de enviar la prueba.'
-      )
-      return
-    }
-
-    envioPruebaEnCurso.current = true
-    setRegistrandoPedidoPrueba(true)
-    setMensaje('')
-    setError('')
-
-    try {
-      const pedidoCreado = await guardarPedido({
-        ...PEDIDO_PRUEBA_BACKEND,
-        deliveryAddress: direccion.trim(),
-        notes: descripcion.trim(),
-        deliveryLat,
-        deliveryLng,
-      })
-      const idPedido = pedidoCreado.id
-
-      setMensaje(
-        idPedido === undefined || idPedido === null
-          ? 'Pedido de prueba registrado en el backend, pero la respuesta no incluyó el ID.'
-          : `Pedido de prueba registrado en el backend. ID: ${idPedido}. Se usaron el customerId y productos de prueba; dirección, notas y coordenadas provienen del formulario.`
-      )
-    } catch (err) {
-      setError(
-        err.message ||
-          'No se pudo registrar el pedido de prueba en el backend.'
-      )
-    } finally {
-      envioPruebaEnCurso.current = false
-      setRegistrandoPedidoPrueba(false)
-    }
   }
 
   const nombreCorto = usuario.nombre?.trim().split(/\s+/)[0] || 'cliente'
@@ -625,8 +577,6 @@ function PortalCliente({ usuario }) {
               setDeliveryLng={setDeliveryLng}
               confirmarUbicacion={setUbicacionConfirmada}
               crearPedido={crearPedido}
-              registrarPedidoPrueba={registrarPedidoPrueba}
-              registrandoPedidoPrueba={registrandoPedidoPrueba}
               mensaje={mensaje}
             />
           </div>
@@ -657,10 +607,24 @@ function PortalCliente({ usuario }) {
           <div className="p-5 sm:p-7">
             {cargando ? (
               <p className="text-sm text-slate-500">Cargando pedidos...</p>
+            ) : usuario.modoDemostracion ? (
+              <p
+                role="status"
+                className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-5 text-amber-900"
+              >
+                La vista de demostración no consulta pedidos reales.
+              </p>
+            ) : typeof usuario.customerId !== 'string' ||
+              !usuario.customerId.trim() ? (
+              <p
+                role="status"
+                className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-5 text-amber-900"
+              >
+                No se puede filtrar la lista: el usuario autenticado no tiene un
+                customerId confirmado por el backend.
+              </p>
             ) : (
-              <ListaPedidos
-                pedidos={pedidos}
-              />
+              <ListaPedidos pedidos={pedidos} />
             )}
           </div>
         </section>
