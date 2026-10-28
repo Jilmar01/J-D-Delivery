@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import FormularioPedido from './FormularioPedido'
 import ListaPedidos from './ListaPedidos'
 import {
@@ -22,20 +22,74 @@ const CATEGORIAS_DEMO = [
 ]
 
 const COMIDAS_DEMO = [
-  { nombre: 'Pizza', imagen: pizza, alt: 'Fotografía de referencia de pizza' },
   {
+    idLocal: 'demo-pizza',
+    nombre: 'Pizza',
+    precioDemo: 12.5,
+    imagen: pizza,
+    alt: 'Fotografía de referencia de pizza',
+  },
+  {
+    idLocal: 'demo-hamburguesa',
     nombre: 'Hamburguesa',
+    precioDemo: 8.75,
     imagen: hamburguesa,
     alt: 'Fotografía de referencia de hamburguesa',
   },
-  { nombre: 'Sushi', imagen: sushi, alt: 'Fotografía de referencia de sushi' },
-  { nombre: 'Pollo', imagen: pollo, alt: 'Fotografía de referencia de pollo' },
   {
+    idLocal: 'demo-sushi',
+    nombre: 'Sushi',
+    precioDemo: 15,
+    imagen: sushi,
+    alt: 'Fotografía de referencia de sushi',
+  },
+  {
+    idLocal: 'demo-pollo',
+    nombre: 'Pollo',
+    precioDemo: 10.25,
+    imagen: pollo,
+    alt: 'Fotografía de referencia de pollo',
+  },
+  {
+    idLocal: 'demo-ensalada',
     nombre: 'Ensalada',
+    precioDemo: 6.5,
     imagen: ensalada,
     alt: 'Fotografía de referencia de ensalada',
   },
 ]
+
+const PEDIDO_PRUEBA_BACKEND = {
+  customerId: 'customer-003',
+  deliveryAddress: 'Calle Bolívar y 10 de Agosto, Loja',
+  notes: 'Entregar en la puerta principal',
+  total: 36.5,
+  items: [
+    {
+      productId: 1,
+      productName: 'Hamburguesa doble',
+      quantity: 2,
+      unitPrice: 12.5,
+    },
+    {
+      productId: 2,
+      productName: 'Papas fritas grandes',
+      quantity: 1,
+      unitPrice: 6.5,
+    },
+    {
+      productId: 3,
+      productName: 'Gaseosa',
+      quantity: 1,
+      unitPrice: 5,
+    },
+  ],
+}
+
+const formatoMoneda = new Intl.NumberFormat('es-EC', {
+  style: 'currency',
+  currency: 'USD',
+})
 
 function IconoCategoria({ tipo }) {
   const iconos = {
@@ -96,51 +150,164 @@ function IconoCategoria({ tipo }) {
 
 function PortalCliente({ usuario }) {
   const [pedidos, setPedidos] = useState([])
+  const [cantidadesCarrito, setCantidadesCarrito] = useState({})
+  const [pedidoBorradorDemo, setPedidoBorradorDemo] = useState(null)
+  const [registrandoPedidoPrueba, setRegistrandoPedidoPrueba] = useState(false)
   const [cliente, setCliente] = useState(usuario.nombre || '')
   const [direccion, setDireccion] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [ubicacionPendiente, setUbicacionPendiente] = useState(null)
   const [ubicacionConfirmada, setUbicacionConfirmada] = useState(null)
+  const [deliveryLat, setDeliveryLat] = useState(null)
+  const [deliveryLng, setDeliveryLng] = useState(null)
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const envioPruebaEnCurso = useRef(false)
+
+  function cambiarCantidad(comida, cambio) {
+    alEditarPedido()
+    setCantidadesCarrito((cantidades) => {
+      const cantidadActual = cantidades[comida.idLocal] || 0
+      const nuevaCantidad = Math.max(0, cantidadActual + cambio)
+
+      if (nuevaCantidad === 0) {
+        const restantes = { ...cantidades }
+        delete restantes[comida.idLocal]
+        return restantes
+      }
+
+      return { ...cantidades, [comida.idLocal]: nuevaCantidad }
+    })
+  }
+
+  const productosSeleccionados = COMIDAS_DEMO
+    .map((comida) => ({
+      ...comida,
+      cantidad: cantidadesCarrito[comida.idLocal] || 0,
+    }))
+    .filter((comida) => comida.cantidad > 0)
+  const totalCarritoCentavos = productosSeleccionados.reduce(
+    (total, comida) =>
+      total + Math.round(comida.precioDemo * 100) * comida.cantidad,
+    0
+  )
+
+  function alEditarPedido() {
+    setPedidoBorradorDemo(null)
+    setMensaje('')
+  }
 
   useEffect(() => {
     async function cargarPedidos() {
       try {
-        const datos = await obtenerPedidosCliente(usuario.correo)
+        const datos = await obtenerPedidosCliente(usuario.customerId)
         setPedidos(datos)
       } catch {
-        setError('No se pudieron cargar los pedidos.')
+        setError('No se pudieron cargar los pedidos. Verifica tu identificador de cliente.')
       } finally {
         setCargando(false)
       }
     }
 
     cargarPedidos()
-  }, [usuario.correo])
+  }, [usuario.customerId])
 
-  async function crearPedido(e) {
+  function crearPedido(e) {
     e.preventDefault()
     setMensaje('')
     setError('')
 
-    try {
-      const nuevoPedido = await guardarPedido({
-        cliente,
-        direccion,
-        descripcion,
-      }, usuario.correo)
+    if (
+      !Number.isFinite(deliveryLat) ||
+      deliveryLat < -90 ||
+      deliveryLat > 90 ||
+      !Number.isFinite(deliveryLng) ||
+      deliveryLng < -180 ||
+      deliveryLng > 180
+    ) {
+      setError(
+        'Selecciona una ubicación válida en el mapa para incluir latitud y longitud.'
+      )
+      return
+    }
 
-      setPedidos((anteriores) => [...anteriores, nuevoPedido])
-      setCliente(usuario.nombre || '')
-      setDireccion('')
-      setDescripcion('')
-      setUbicacionPendiente(null)
-      setUbicacionConfirmada(null)
-      setMensaje('¡Pedido registrado correctamente!')
-    } catch {
-      setError('No se pudo registrar el pedido. Intenta nuevamente.')
+    if (productosSeleccionados.length === 0) {
+      setError('Agrega al menos un producto al carrito para preparar el pedido.')
+      return
+    }
+
+    const borrador = {
+      esDemostracion: true,
+      deliveryAddress: direccion.trim(),
+      deliveryLat,
+      deliveryLng,
+      notes: descripcion.trim(),
+      items: productosSeleccionados.map((comida) => ({
+        idLocalDemo: comida.idLocal,
+        productNameDemo: comida.nombre,
+        quantity: comida.cantidad,
+        unitPriceDemo: comida.precioDemo,
+      })),
+      totalDemo: totalCarritoCentavos / 100,
+    }
+
+    setPedidoBorradorDemo(borrador)
+    setMensaje(
+      'Borrador de demostración preparado. No se envió ni se registró ningún pedido.'
+    )
+  }
+
+  async function registrarPedidoPrueba() {
+    if (envioPruebaEnCurso.current) return
+
+    if (!direccion.trim()) {
+      setError('Completa la dirección de entrega antes de enviar la prueba.')
+      return
+    }
+
+    if (
+      !Number.isFinite(deliveryLat) ||
+      deliveryLat < -90 ||
+      deliveryLat > 90 ||
+      !Number.isFinite(deliveryLng) ||
+      deliveryLng < -180 ||
+      deliveryLng > 180
+    ) {
+      setError(
+        'Selecciona una ubicación válida en el mapa antes de enviar la prueba.'
+      )
+      return
+    }
+
+    envioPruebaEnCurso.current = true
+    setRegistrandoPedidoPrueba(true)
+    setMensaje('')
+    setError('')
+
+    try {
+      const pedidoCreado = await guardarPedido({
+        ...PEDIDO_PRUEBA_BACKEND,
+        deliveryAddress: direccion.trim(),
+        notes: descripcion.trim(),
+        deliveryLat,
+        deliveryLng,
+      })
+      const idPedido = pedidoCreado.id
+
+      setMensaje(
+        idPedido === undefined || idPedido === null
+          ? 'Pedido de prueba registrado en el backend, pero la respuesta no incluyó el ID.'
+          : `Pedido de prueba registrado en el backend. ID: ${idPedido}. Se usaron el customerId y productos de prueba; dirección, notas y coordenadas provienen del formulario.`
+      )
+    } catch (err) {
+      setError(
+        err.message ||
+          'No se pudo registrar el pedido de prueba en el backend.'
+      )
+    } finally {
+      envioPruebaEnCurso.current = false
+      setRegistrandoPedidoPrueba(false)
     }
   }
 
@@ -242,13 +409,13 @@ function PortalCliente({ usuario }) {
               </h2>
             </div>
             <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
-              Solo demostración · no disponible para compra
+              Precios temporales de demostración
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {COMIDAS_DEMO.map((comida) => (
               <article
-                key={comida.nombre}
+                key={comida.idLocal}
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/50"
               >
                 <img
@@ -261,12 +428,96 @@ function PortalCliente({ usuario }) {
                   <h3 className="text-sm font-semibold text-slate-800">
                     {comida.nombre}
                   </h3>
-                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                    Imagen de referencia
+                  <p className="mt-1 text-sm font-semibold text-blue-700">
+                    {formatoMoneda.format(comida.precioDemo)}
                   </p>
+                  <p className="mt-1 text-[11px] leading-4 text-amber-700">
+                    Precio temporal
+                  </p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(comida, -1)}
+                      disabled={!cantidadesCarrito[comida.idLocal]}
+                      aria-label={`Disminuir cantidad de ${comida.nombre}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-lg font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span
+                      aria-live="polite"
+                      aria-label={`Cantidad de ${comida.nombre}`}
+                      className="min-w-6 text-center text-sm font-semibold text-slate-800"
+                    >
+                      {cantidadesCarrito[comida.idLocal] || 0}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => cambiarCantidad(comida, 1)}
+                      aria-label={`Aumentar cantidad de ${comida.nombre}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-700 text-lg font-semibold text-white transition hover:bg-blue-800"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {cantidadesCarrito[comida.idLocal] > 0 && (
+                    <p className="mt-3 text-xs font-medium text-slate-600">
+                      Subtotal:{' '}
+                      {formatoMoneda.format(
+                        (Math.round(comida.precioDemo * 100) *
+                          cantidadesCarrito[comida.idLocal]) /
+                          100
+                      )}
+                    </p>
+                  )}
                 </div>
               </article>
             ))}
+          </div>
+          <div
+            aria-live="polite"
+            className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50 sm:p-6"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Carrito de demostración
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-amber-700">
+                  Los productos y precios son temporales y todavía no se envían
+                  al backend.
+                </p>
+              </div>
+              <p className="text-lg font-bold text-slate-950">
+                Total: {formatoMoneda.format(totalCarritoCentavos / 100)}
+              </p>
+            </div>
+            {productosSeleccionados.length === 0 ? (
+              <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-600">
+                Tu carrito está vacío. Agrega productos con el botón +.
+              </p>
+            ) : (
+              <ul className="mt-4 divide-y divide-slate-100">
+                {productosSeleccionados.map((comida) => {
+                  const subtotalCentavos =
+                    Math.round(comida.precioDemo * 100) * comida.cantidad
+
+                  return (
+                    <li
+                      key={comida.idLocal}
+                      className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                    >
+                      <span className="font-medium text-slate-800">
+                        {comida.nombre} × {comida.cantidad}
+                      </span>
+                      <span className="font-semibold text-slate-700">
+                        {formatoMoneda.format(subtotalCentavos / 100)}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
         </section>
 
@@ -363,11 +614,20 @@ function PortalCliente({ usuario }) {
               setDescripcion={setDescripcion}
               ubicacionPendiente={ubicacionPendiente}
               ubicacionConfirmada={ubicacionConfirmada}
+              deliveryLat={deliveryLat}
+              deliveryLng={deliveryLng}
+              productosCarritoDemo={productosSeleccionados}
+              totalCarritoDemo={totalCarritoCentavos}
+              pedidoBorradorDemo={pedidoBorradorDemo}
+              alEditarPedido={alEditarPedido}
               setUbicacionPendiente={setUbicacionPendiente}
+              setDeliveryLat={setDeliveryLat}
+              setDeliveryLng={setDeliveryLng}
               confirmarUbicacion={setUbicacionConfirmada}
               crearPedido={crearPedido}
+              registrarPedidoPrueba={registrarPedidoPrueba}
+              registrandoPedidoPrueba={registrandoPedidoPrueba}
               mensaje={mensaje}
-              setMensaje={setMensaje}
             />
           </div>
         </section>
