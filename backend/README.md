@@ -45,22 +45,11 @@ Ejemplo para `order-service`:
 cd backend/order-service
 npm install
 npx prisma generate
+npx prisma migrate dev
 npm run dev
 ```
 
 Para ejecutar los otros servicios, sustituye `order-service` por el nombre del directorio correspondiente.
-
-## Configuración de Prisma
-
-El esquema de la base de datos se define en `prisma/schema.prisma`.
-
-Para aplicar los cambios del esquema mediante migraciones durante el desarrollo:
-
-```bash
-npx prisma migrate dev --name init
-```
-
-Ejecuta este comando dentro del directorio del microservicio correspondiente, después de definir sus modelos en `schema.prisma`.
 
 ## Verificación
 
