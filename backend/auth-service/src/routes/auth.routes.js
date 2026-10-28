@@ -7,46 +7,65 @@ const router = Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const { correo, password } = req.body;
+    const { email, password } = req.body;
+
+    console.log(email, password);
 
     if (
-      typeof correo !== "string" ||
+      typeof email !== "string" ||
       typeof password !== "string" ||
-      !correo.trim() ||
+      !email.trim() ||
       !password
     ) {
       return res.status(400).json({
         success: false,
-        message: "Correo y contraseña son obligatorios",
+        message: "Correo electrónico y contraseña son obligatorios",
       });
     }
 
-    const usuario = await prisma.usuario.findUnique({
-      where: { correo: correo.trim().toLowerCase() },
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email.trim().toLowerCase(),
+      },
     });
 
-    if (!usuario || !(await bcrypt.compare(password, usuario.password))) {
+    if (
+      !user ||
+      !(await bcrypt.compare(password, user.password))
+    ) {
       return res.status(401).json({
         success: false,
         message: "Credenciales incorrectas",
       });
     }
 
+    if (!user.active) {
+      return res.status(403).json({
+        success: false,
+        message: "La cuenta está desactivada",
+      });
+    }
+
     const token = jwt.sign(
-      { id: usuario.id, rol: usuario.rol },
+      {
+        id: user.id,
+        role: user.role,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      {
+        expiresIn: "2h",
+      }
     );
 
     return res.status(200).json({
       success: true,
       message: "Inicio de sesión exitoso",
       token,
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        correo: usuario.correo,
-        rol: usuario.rol,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
       },
     });
   } catch (error) {

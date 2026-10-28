@@ -1,26 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
-enum EstadoPedido {
-  PENDIENTE
-  CONFIRMADO
-  EN_PREPARACION
-  EN_CAMINO
-  ENTREGADO
-  CANCELADO
-}
-
-model Pedido {
-  id          Int          @id @default(autoincrement())
-  clienteId   String
-  descripcion String?
-  total       Decimal      @db.Decimal(10, 2)
-  estado      EstadoPedido @default(PENDIENTE)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-}
+// Migracion de Base de Datos: delivery_order_db
 
 generator client {
   provider = "prisma-client-js"
@@ -29,4 +7,55 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  customerId      String
+  deliveryAddress String
+  notes           String?
+  total           Decimal     @db.Decimal(10, 2)
+  status          OrderStatus @default(PENDING)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id            Int      @id @default(autoincrement())
+  orderId       Int
+  productId     Int
+  productName   String
+  quantity      Int
+  unitPrice     Decimal  @db.Decimal(10, 2)
+  subtotal      Decimal  @db.Decimal(10, 2)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("products")
 }

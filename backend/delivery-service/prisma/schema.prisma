@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Delivery {
+  id              Int               @id @default(autoincrement())
+  orderId         Int
+  courierId       Int
+  deliveryAddress String
+  status          DeliveryStatus    @default(PENDING)
+  assignedAt      DateTime?
+  startedAt       DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  history         DeliveryHistory[]
+
+  @@map("deliveries")
+}
+
+model DeliveryHistory {
+  id             Int             @id @default(autoincrement())
+  deliveryId     Int
+  previousStatus DeliveryStatus?
+  newStatus      DeliveryStatus
+  date           DateTime        @default(now())
+  notes          String?
+  delivery       Delivery        @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@map("delivery_history")
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}

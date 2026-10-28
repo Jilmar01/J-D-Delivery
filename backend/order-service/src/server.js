@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 import { prisma } from "../config/database.js";
 
 // Rutas de Endpoints
@@ -14,6 +15,7 @@ const SERVICE_NAME = process.env.SERVICE_NAME || "order-service";
 
 // Middlewares globales
 app.use(express.json());
+app.use(cors({ origin: true, credentials: true }));
 
 // Ruta principal
 app.get("/", (req, res) => {

@@ -1,0 +1,31 @@
+// Migracion de Base de Datos: delivery_notification_db
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_UPDATED
+  ORDER_CANCELLED
+  DELIVERY_ASSIGNED
+  DELIVERY_UPDATED
+  DELIVERY_COMPLETED
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  orderId   Int?
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}

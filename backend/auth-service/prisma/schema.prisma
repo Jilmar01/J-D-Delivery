@@ -1,8 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Migracion de Base de Datos: delivery_auth_db
 
 generator client {
   provider = "prisma-client-js"
@@ -13,16 +9,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Rol {
-  CLIENTE
+enum UserRole {
+  CUSTOMER
+  DELIVERY_PERSON
   ADMIN
 }
 
-model Usuario {
-  id              Int      @id @default(autoincrement())
-  usuario         String
-  correo          String   @unique
-  password        String
-  rol             Rol      @default(CLIENTE)
-  createdAt       DateTime @default(now())
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  email        String   @unique
+  password     String
+  phone        String?
+  role         UserRole @default(CUSTOMER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("users")
 }
