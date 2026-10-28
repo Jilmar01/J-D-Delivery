@@ -1,9 +1,16 @@
 
-const API_URL = (
-  import.meta.env.VITE_API_URL || 'http://localhost:3001'
-).replace(/\/$/, '')
+const API_URL = import.meta.env.DEV
+  ? ''
+  : (
+      import.meta.env.URL_PEDIDOS ||
+      import.meta.env.VITE_API_URL ||
+      'http://localhost:3001'
+    ).replace(/\/$/, '')
 const WS_URL =
-  import.meta.env.VITE_WS_URL || `${API_URL.replace(/^http/, 'ws')}/ws`
+  import.meta.env.VITE_WS_URL ||
+  (import.meta.env.DEV
+    ? '/ws'
+    : `${API_URL.replace(/^http/, 'ws')}/ws`)
 
 /**
  * Las vistas de cliente y repartidor conservan sus datos simulados.
@@ -45,6 +52,15 @@ export async function actualizarEstadoPedido(id, estado) {
 
 function normalizarPedidoAdministrativo(pedido) {
   const id = Number(pedido?.id)
+  const estados = {
+    PENDING: 'PENDIENTE',
+    CONFIRMED: 'CONFIRMADO',
+    PREPARING: 'EN_PREPARACION',
+    IN_DELIVERY: 'EN_CAMINO',
+    DELIVERED: 'ENTREGADO',
+    CANCELLED: 'CANCELADO',
+  }
+  const estadoOriginal = pedido?.estado || pedido?.status
 
   if (!pedido || typeof pedido !== 'object' || !Number.isSafeInteger(id)) {
     throw new Error('El servidor devolvió un pedido con formato no válido.')
@@ -53,12 +69,19 @@ function normalizarPedidoAdministrativo(pedido) {
   return {
     ...pedido,
     id,
-    cliente: pedido.clienteId || `Cliente ${pedido.id}`,
+    estado:
+      estados[String(estadoOriginal).toUpperCase()] ||
+      String(estadoOriginal || 'PENDIENTE').toUpperCase(),
+    cliente:
+      pedido.clienteId ||
+      pedido.customerId ||
+      pedido.cliente ||
+      `Cliente ${pedido.id}`,
     repartidor: pedido.repartidorId
       ? `Repartidor ${pedido.repartidorId}`
       : 'Sin asignar',
-    fecha: pedido.createdAt
-      ? new Date(pedido.createdAt).toLocaleString('es-EC')
+    fecha: pedido.createdAt || pedido.fecha
+      ? new Date(pedido.createdAt || pedido.fecha).toLocaleString('es-EC')
       : '—',
   }
 }
@@ -94,6 +117,23 @@ export async function obtenerPedidosAdministrativos(token) {
   }
 
   return respuesta.data.map(normalizarPedidoAdministrativo)
+}
+
+export async function obtenerPedidosParaVistaPrevia() {
+  const respuesta = await fetch(`${API_URL}/api/pedidos`)
+  const datos = await respuesta.json().catch(() => null)
+
+  if (!respuesta.ok) {
+    throw new Error(
+      datos?.message || `La API de pedidos respondió con ${respuesta.status}.`
+    )
+  }
+
+  if (!Array.isArray(datos?.data)) {
+    throw new Error('La API no devolvió una lista válida de pedidos.')
+  }
+
+  return datos.data.map(normalizarPedidoAdministrativo)
 }
 
 export async function cambiarEstadoAdministrativo(id, estado, token) {

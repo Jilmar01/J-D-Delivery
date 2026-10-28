@@ -3,6 +3,7 @@ import {
   cambiarEstadoAdministrativo,
   normalizarEventoPedido,
   obtenerPedidosAdministrativos,
+  obtenerPedidosParaVistaPrevia,
   WS_URL,
 } from '../services/pedidosService'
 import { colorEstado, etiquetaEstado } from '../utils/estados'
@@ -27,45 +28,6 @@ const TRANSICIONES = {
 
 const FILTROS = ['TODOS', ...ESTADOS]
 
-const PEDIDOS_DEMO = [
-  {
-    id: 1,
-    clienteId: 'Cliente A',
-    cliente: 'Cliente A',
-    estado: 'PENDIENTE',
-    repartidor: 'Sin asignar',
-    total: '18.50',
-    fecha: '26/10/2026',
-  },
-  {
-    id: 2,
-    clienteId: 'Cliente B',
-    cliente: 'Cliente B',
-    estado: 'CONFIRMADO',
-    repartidor: 'Sin asignar',
-    total: '24.00',
-    fecha: '26/10/2026',
-  },
-  {
-    id: 3,
-    clienteId: 'Cliente C',
-    cliente: 'Cliente C',
-    estado: 'EN_CAMINO',
-    repartidor: 'Sin asignar',
-    total: '12.75',
-    fecha: '26/10/2026',
-  },
-  {
-    id: 4,
-    clienteId: 'Cliente D',
-    cliente: 'Cliente D',
-    estado: 'ENTREGADO',
-    repartidor: 'Sin asignar',
-    total: '9.99',
-    fecha: '25/10/2026',
-  },
-]
-
 function mostrarTotal(total) {
   const valor = Number(total)
 
@@ -80,11 +42,9 @@ function mostrarTotal(total) {
 }
 
 function PanelAdministrativo({ usuario }) {
-  const [pedidos, setPedidos] = useState(() =>
-    usuario.demo ? PEDIDOS_DEMO.map((pedido) => ({ ...pedido })) : []
-  )
+  const [pedidos, setPedidos] = useState([])
   const [filtro, setFiltro] = useState('TODOS')
-  const [cargando, setCargando] = useState(!usuario.demo)
+  const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [estadoSocket, setEstadoSocket] = useState(
     usuario.demo ? 'demo' : 'conectando'
@@ -92,20 +52,19 @@ function PanelAdministrativo({ usuario }) {
   const [actualizando, setActualizando] = useState([])
 
   useEffect(() => {
-    if (usuario.demo) {
-      return undefined
-    }
-
     let desmontado = false
     let reintento
     let socket
     let versionEventos = 0
+    const token = usuario.demo ? undefined : usuario.token
 
     async function cargarPedidos() {
       const versionInicial = versionEventos
 
       try {
-        const datos = await obtenerPedidosAdministrativos(usuario.token)
+        const datos = usuario.demo
+          ? await obtenerPedidosParaVistaPrevia()
+          : await obtenerPedidosAdministrativos(token)
 
         if (!desmontado && versionInicial === versionEventos) {
           setPedidos(datos)
@@ -119,6 +78,14 @@ function PanelAdministrativo({ usuario }) {
         if (!desmontado) {
           setCargando(false)
         }
+      }
+    }
+
+    cargarPedidos()
+
+    if (usuario.demo) {
+      return () => {
+        desmontado = true
       }
     }
 
@@ -189,7 +156,6 @@ function PanelAdministrativo({ usuario }) {
       }
     }
 
-    cargarPedidos()
     conectarWebSocket()
 
     return () => {
@@ -202,14 +168,11 @@ function PanelAdministrativo({ usuario }) {
   async function recargarPedidos() {
     setCargando(true)
 
-    if (usuario.demo) {
-      setPedidos(PEDIDOS_DEMO.map((pedido) => ({ ...pedido })))
-      setCargando(false)
-      return
-    }
-
     try {
-      setPedidos(await obtenerPedidosAdministrativos(usuario.token))
+      const datos = usuario.demo
+        ? await obtenerPedidosParaVistaPrevia()
+        : await obtenerPedidosAdministrativos(usuario.token)
+      setPedidos(datos)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los pedidos.')
@@ -287,7 +250,7 @@ function PanelAdministrativo({ usuario }) {
               role="status"
               className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-300"
             >
-              Demostración · datos de ejemplo
+              Vista previa · datos desde API
             </div>
           ) : (
             <div
@@ -492,7 +455,7 @@ function PanelAdministrativo({ usuario }) {
         <div className="border-t border-white/10 px-5 py-3 text-xs text-zinc-500 sm:px-7">
           Mostrando {pedidosVisibles.length} de {pedidos.length} pedidos · Los
           {usuario.demo
-            ? ' cambios solo se aplican a estos datos de ejemplo.'
+            ? ' cambios de estado son solo locales en esta vista previa.'
             : ' cambios de estado se guardan en la API.'}
         </div>
       </section>

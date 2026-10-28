@@ -17,18 +17,19 @@ El rol `ADMIN` dispone de una tabla de pedidos con filtros por estado, acciones 
 
 ### Ejecución local
 
-Para enseñar una vista rápida sin configurar una cuenta ni la base de datos, desde `frontend` ejecuta `npm run dev` y abre `http://localhost:5173/?demo=admin`. Este modo muestra pedidos ficticios, permite probar filtros y cambios de estado localmente y solo está disponible con el servidor de desarrollo de Vite; no usa la API ni WebSockets.
+Para ver los pedidos de la API sin configurar una cuenta administrativa, desde `frontend` ejecuta `npm run dev` y abre `http://localhost:5173/?demo=admin`. Esta vista previa consulta la API configurada en `URL_PEDIDOS`, pero los cambios de estado son solo locales. La URL sin `?demo=admin` solicita iniciar sesión con un usuario `ADMIN` y usa las rutas administrativas autenticadas.
 
 Para compartir la demostración con compañeros conectados a la misma red Wi-Fi, inicia Vite con `npm run dev -- --host 0.0.0.0` y comparte `http://IP-DE-TU-COMPUTADORA:5173/?demo=admin` (consulta tu IP con `ipconfig`). Es posible que Windows solicite permiso para que otros dispositivos de la red accedan al puerto.
 
 1. Configura `DATABASE_URL` y `JWT_SECRET` en `backend/order-service/.env`. Usa el mismo `JWT_SECRET` en `backend/auth-service/.env`, para que el servicio de pedidos pueda validar el token de inicio de sesión.
 2. En `backend/order-service`, ejecuta `npm install` y `npm run dev`.
-3. En `frontend/.env.local`, configura:
+3. En `frontend/.env`, configura la URL base de la API de pedidos. La variable `URL_PEDIDOS` existente se utiliza directamente:
 
    ```env
-   VITE_API_URL=http://localhost:3001
-   VITE_WS_URL=ws://localhost:3001/ws
+   URL_PEDIDOS=https://tu-api.example.com
    ```
+
+   Si `URL_PEDIDOS` ya existe en el `.env`, conserva su valor. También se admiten `VITE_API_URL` y `VITE_WS_URL` como alternativas. En desarrollo, Vite hace proxy de `/api` y `/ws` a esa URL para evitar errores CORS. En producción, el servidor de la API debe permitir el origen del frontend; el WebSocket se deriva de `URL_PEDIDOS` (`https` se convierte en `wss` y `http` en `ws`).
 
 4. En `frontend`, ejecuta `npm install` y `npm run dev`, e inicia sesión con una cuenta cuyo rol sea `ADMIN`.
 
