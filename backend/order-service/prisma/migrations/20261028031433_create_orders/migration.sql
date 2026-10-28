@@ -1,23 +1,13 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Pedido` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'CONFIRMED', 'PREPARING', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED');
-
--- DropTable
-DROP TABLE "Pedido";
-
--- DropEnum
-DROP TYPE "EstadoPedido";
 
 -- CreateTable
 CREATE TABLE "orders" (
     "id" SERIAL NOT NULL,
     "customerId" TEXT NOT NULL,
     "deliveryAddress" TEXT NOT NULL,
+    "deliveryLat" DOUBLE PRECISION NOT NULL,
+    "deliveryLng" DOUBLE PRECISION NOT NULL,
     "notes" TEXT,
     "total" DECIMAL(10,2) NOT NULL,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING',

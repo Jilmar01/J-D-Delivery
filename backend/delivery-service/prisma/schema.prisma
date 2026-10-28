@@ -1,3 +1,5 @@
+// Database Migration: delivery_delivery_db
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,30 +10,34 @@ datasource db {
 }
 
 model Delivery {
-  id              Int               @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   orderId         Int
   courierId       Int?
   deliveryAddress String
-  status          DeliveryStatus    @default(PENDING)
+  deliveryLat     Float
+  deliveryLng     Float
+  status          DeliveryStatus @default(PENDING)
   assignedAt      DateTime?
   startedAt       DateTime?
   deliveredAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  history         DeliveryHistory[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  history DeliveryHistory[]
 
   @@unique([orderId])
   @@map("deliveries")
 }
 
 model DeliveryHistory {
-  id             Int             @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   deliveryId     Int
   previousStatus DeliveryStatus?
   newStatus      DeliveryStatus
-  date           DateTime        @default(now())
+  date           DateTime       @default(now())
   notes          String?
-  delivery       Delivery        @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
 
   @@map("delivery_history")
 }

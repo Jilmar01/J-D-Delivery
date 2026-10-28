@@ -1,10 +1,12 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import { prisma } from "../config/database.js";
+
+import { prisma } from "./config/database.js";
 
 // Rutas de Endpoints
 import orderRoutes from "./routes/order.routes.js";
+import productRoutes from "./routes/product.routes.js"
 
 dotenv.config();
 
@@ -28,6 +30,9 @@ app.get("/", (req, res) => {
 
 // Ruta pedidos
 app.use("/api/orders", orderRoutes);
+
+// Ruta productos
+app.use("/api/products", productRoutes);
 
 // Endpoint de salud
 app.get("/health", (req, res) => {

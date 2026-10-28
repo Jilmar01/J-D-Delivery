@@ -2,6 +2,10 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 
+import { prisma } from "./config/database.js";
+
+import deliveryRoutes from "./routes/delivery.routes.js";
+
 dotenv.config();
 
 const app = express();
@@ -21,6 +25,9 @@ app.get("/", (req, res) => {
     message: "Microservicio de delivery funcionando",
   });
 });
+
+// Ruta entregas
+app.use("/api/deliveries", deliveryRoutes);
 
 // Endpoint de salud
 app.get("/health", (req, res) => {
@@ -50,6 +57,12 @@ app.use((err, req, res, next) => {
     message: "Error interno del servidor",
   });
 });
+
+// Conexion con la base de datos
+prisma.$connect()
+  .then(() => console.log("Conexión con PostgreSQL exitosa"))
+  .catch((error) => console.error("Error de conexión:", error.message));
+
 
 // Escuchar en todas las interfaces de red
 app.listen(PORT, "0.0.0.0", () => {

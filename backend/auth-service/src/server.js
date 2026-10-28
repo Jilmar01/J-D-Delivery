@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import { prisma } from "../config/database.js";
+import { prisma } from "./config/database.js";
 
 // Rutas de Endpoints
 import authRoutes from "./routes/auth.routes.js";
