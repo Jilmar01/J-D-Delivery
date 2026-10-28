@@ -24,7 +24,7 @@ const ESTILOS_ESTADO = {
   CANCELADO: 'border-red-200 bg-red-50 text-red-800',
 }
 
-function PanelRepartidor() {
+function PanelRepartidor({ usuario }) {
   const [pedidos, setPedidos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
@@ -32,7 +32,7 @@ function PanelRepartidor() {
   useEffect(() => {
     async function cargarPedidos() {
       try {
-        setPedidos(await obtenerPedidos())
+        setPedidos(await obtenerPedidos({ demo: usuario?.modoDemostracion }))
       } catch {
         setError('No se pudieron cargar los pedidos.')
       } finally {
@@ -41,7 +41,7 @@ function PanelRepartidor() {
     }
 
     cargarPedidos()
-  }, [])
+  }, [usuario?.modoDemostracion])
 
   async function avanzarEstado(pedido) {
     const accion = SIGUIENTE_ACCION[pedido.estado]
@@ -52,12 +52,15 @@ function PanelRepartidor() {
     setError('')
 
     try {
-      const actualizado = await actualizarEstadoPedido(pedido.id, nuevoEstado)
+      const actualizado = await actualizarEstadoPedido(pedido.id, nuevoEstado, {
+        demo: usuario?.modoDemostracion,
+        courierId: Number(usuario?.id),
+      })
       setPedidos((anteriores) =>
         anteriores.map((p) => (p.id === actualizado.id ? actualizado : p))
       )
-    } catch {
-      setError('No se pudo actualizar el estado del pedido.')
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar el estado del pedido.')
     }
   }
 
@@ -230,6 +233,16 @@ function PanelRepartidor() {
                           <p className="mt-1.5 break-words text-sm font-medium leading-6 text-slate-800">
                             {pedido.direccion}
                           </p>
+                          {pedido.lat != null && pedido.lng != null && (
+                            <a
+                              href={`https://www.google.com/maps?q=${pedido.lat},${pedido.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-block text-sm font-semibold text-blue-700 underline-offset-2 hover:underline"
+                            >
+                              Ver punto de entrega en el mapa
+                            </a>
+                          )}
                         </div>
                         <div className="sm:col-span-2">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

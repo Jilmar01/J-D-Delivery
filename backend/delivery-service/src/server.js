@@ -6,7 +6,7 @@ dotenv.config();
 
 const app = express();
 
-const PORT = Number(process.env.PORT) || 3003;
+const PORT = Number(process.env.PORT) || 3002;
 const SERVICE_NAME = process.env.SERVICE_NAME || "delivery-service";
 
 // Middlewares globales

@@ -22,6 +22,8 @@ model Order {
   id              Int         @id @default(autoincrement())
   customerId      String
   deliveryAddress String
+  deliveryLat     Decimal?    @db.Decimal(9, 6)
+  deliveryLng     Decimal?    @db.Decimal(9, 6)
   notes           String?
   total           Decimal     @db.Decimal(10, 2)
   status          OrderStatus @default(PENDING)

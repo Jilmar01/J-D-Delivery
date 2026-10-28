@@ -2,14 +2,6 @@
 // CLIENTE TCP PROGRAMÁTICO - J&D DELIVERY  (BE2-06)
 // Proceso independiente que envía un mensaje JSON al servidor TCP y devuelve la
 // respuesta. Funciona en la misma PC o en otra (TCP_HOST = IP del servidor).
-//
-// Consola:
-//   node src/tcp-client.js ASIGNAR_PEDIDO <pedidoId> <repartidorId>
-//   node src/tcp-client.js CONSULTAR_PEDIDO <pedidoId>
-//   node src/tcp-client.js EVENTO <TIPO> <pedidoId> [repartidorId]   (p. ej. PEDIDO_ASIGNADO)
-// Código:
-//   const { enviarMensaje } = require('./tcp-client');
-//   const respuesta = await enviarMensaje({ tipo: 'ASIGNAR_PEDIDO', pedidoId: 1, repartidorId: 7 });
 // =============================================================================
 const net = require('net');
 
@@ -46,11 +38,13 @@ if (require.main === module) {
     let mensaje;
     if (tipo === 'ASIGNAR_PEDIDO') mensaje = { tipo, pedidoId: num(args[0]), repartidorId: num(args[1]) };
     else if (tipo === 'CONSULTAR_PEDIDO') mensaje = { tipo, pedidoId: num(args[0]) };
+    else if (tipo === 'NUEVO_PEDIDO') mensaje = { tipo, pedidoId: num(args[0]), lat: num(args[1]), lng: num(args[2]), direccion: args[3] };
     else if (tipo === 'EVENTO') mensaje = { tipo: args[0], pedidoId: num(args[1]), repartidorId: num(args[2]) };
 
     if (!mensaje) {
         console.error('Uso: node src/tcp-client.js ASIGNAR_PEDIDO <pedidoId> <repartidorId>\n' +
             '     node src/tcp-client.js CONSULTAR_PEDIDO <pedidoId>\n' +
+            '     node src/tcp-client.js NUEVO_PEDIDO <pedidoId> <lat> <lng> [direccion]\n' +
             '     node src/tcp-client.js EVENTO <TIPO> <pedidoId> [repartidorId]');
         process.exit(1);
     }

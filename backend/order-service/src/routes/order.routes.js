@@ -1,35 +1,91 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/database.js";
+import { enviarMensajeTcp } from "../services/tcp.js";
 
 const router = Router();
+
+const ESTADOS = [
+  "PENDING",
+  "CONFIRMED",
+  "PREPARING",
+  "IN_TRANSIT",
+  "DELIVERED",
+  "CANCELLED",
+];
+
+// CONFIRMED significa "asignado a un repartidor": el enum de orders no tiene ASSIGNED
+// (ese estado vive en deliveries). Por eso se permite pasar de CONFIRMED a IN_TRANSIT.
+const TRANSICIONES = {
+  PENDING: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["PREPARING", "IN_TRANSIT", "CANCELLED"],
+  PREPARING: ["IN_TRANSIT", "CANCELLED"],
+  IN_TRANSIT: ["DELIVERED"],
+  DELIVERED: [],
+  CANCELLED: [],
+};
+
+const esLatitud = (v) => typeof v === "number" && Number.isFinite(v) && v >= -90 && v <= 90;
+const esLongitud = (v) => typeof v === "number" && Number.isFinite(v) && v >= -180 && v <= 180;
+
+// Punto de salida (el local): desde él se elige al repartidor más cercano
+function puntoDeSalida() {
+  const lat = Number(process.env.PICKUP_LAT);
+  const lng = Number(process.env.PICKUP_LNG);
+  if (process.env.PICKUP_LAT === undefined || process.env.PICKUP_LNG === undefined) return null;
+  return esLatitud(lat) && esLongitud(lng) ? { lat, lng } : null;
+}
+
+// Aviso al servidor TCP de concurrencia para que ofrezca el pedido a los repartidores
+// más cercanos. Si falla, el pedido ya está creado: se informa pero no se deshace.
+async function ofrecerPedido(order) {
+  const salida = puntoDeSalida();
+  if (!salida) return { enviada: false, motivo: "PICKUP_LAT/PICKUP_LNG no configurados" };
+
+  try {
+    const respuesta = await enviarMensajeTcp({
+      tipo: "NUEVO_PEDIDO",
+      pedidoId: order.id,
+      lat: salida.lat,
+      lng: salida.lng,
+      direccion: order.deliveryAddress,
+      ...(order.deliveryLat !== null && {
+        entregaLat: Number(order.deliveryLat),
+        entregaLng: Number(order.deliveryLng),
+      }),
+    });
+    return { enviada: respuesta.tipo === "OFERTA_ENVIADA", respuesta };
+  } catch (error) {
+    console.error("No se pudo avisar al servidor TCP:", error.message);
+    return { enviada: false, motivo: "Servidor TCP no disponible" };
+  }
+}
 
 // POST /api/orders - Crear pedido
 router.post("/", async (req, res) => {
   try {
-    const { customerId, deliveryAddress, notes, total, items } = req.body;
+    const { customerId, deliveryAddress, notes, total, items, deliveryLat, deliveryLng } =
+      req.body;
 
     if (
       typeof customerId !== "string" ||
       !customerId.trim() ||
       typeof deliveryAddress !== "string" ||
-      !deliveryAddress.trim() ||
-      total === undefined ||
-      total === null ||
-      total === ""
+      !deliveryAddress.trim()
     ) {
       return res.status(400).json({
         success: false,
-        message: "customerId, deliveryAddress y total son obligatorios",
+        message: "customerId y deliveryAddress son obligatorios",
       });
     }
 
-    const totalNumber = Number(total);
+    // El total es opcional: sin productos todavía se registra en 0
+    const totalNumber = total === undefined || total === null || total === "" ? 0 : Number(total);
 
-    if (!Number.isFinite(totalNumber) || totalNumber <= 0) {
+    if (!Number.isFinite(totalNumber) || totalNumber < 0) {
       return res.status(400).json({
         success: false,
-        message: "El total debe ser un número mayor que cero",
+        message: "El total debe ser un número mayor o igual que cero",
       });
     }
 
@@ -37,6 +93,16 @@ router.post("/", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Las notas deben ser un texto",
+      });
+    }
+
+    // Las coordenadas de entrega van juntas: se guardan en el pedido y se reenvían al
+    // servidor TCP, que las incluye en la oferta al repartidor
+    const hayCoordenadas = deliveryLat !== undefined || deliveryLng !== undefined;
+    if (hayCoordenadas && (!esLatitud(deliveryLat) || !esLongitud(deliveryLng))) {
+      return res.status(400).json({
+        success: false,
+        message: "deliveryLat y deliveryLng deben ser coordenadas numéricas válidas",
       });
     }
 
@@ -98,6 +164,10 @@ router.post("/", async (req, res) => {
         deliveryAddress: deliveryAddress.trim(),
         notes: notes?.trim() || null,
         total: new Prisma.Decimal(totalNumber.toFixed(2)),
+        ...(hayCoordenadas && {
+          deliveryLat: new Prisma.Decimal(deliveryLat.toFixed(6)),
+          deliveryLng: new Prisma.Decimal(deliveryLng.toFixed(6)),
+        }),
         items: {
           create: orderItems.map((item) => {
             const unitPrice = Number(item.unitPrice);
@@ -119,10 +189,13 @@ router.post("/", async (req, res) => {
       },
     });
 
+    const oferta = await ofrecerPedido(order);
+
     return res.status(201).json({
       success: true,
       message: "Pedido creado correctamente",
       data: order,
+      oferta: { enviada: oferta.enviada, ...(oferta.motivo && { motivo: oferta.motivo }) },
     });
   } catch (error) {
     console.error("Error al crear pedido:", error);
@@ -134,10 +207,23 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/pedidos - Consultar todos los pedidos
+// GET /api/orders - Consultar pedidos (filtros opcionales: ?status=PENDING&customerId=...)
 router.get("/", async (req, res) => {
   try {
+    const { status, customerId } = req.query;
+
+    if (status !== undefined && !ESTADOS.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `status debe ser uno de: ${ESTADOS.join(", ")}`,
+      });
+    }
+
     const orders = await prisma.order.findMany({
+      where: {
+        ...(status && { status }),
+        ...(typeof customerId === "string" && customerId && { customerId }),
+      },
       include: {
         items: true,
       },
@@ -161,7 +247,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET /api/pedidos/:id - Consultar un pedido por ID
+// GET /api/orders/:id - Consultar un pedido por ID
 router.get("/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -173,11 +259,12 @@ router.get("/:id", async (req, res) => {
       });
     }
 
-    const pedido = await prisma.pedido.findUnique({
+    const order = await prisma.order.findUnique({
       where: { id },
+      include: { items: true },
     });
 
-    if (!pedido) {
+    if (!order) {
       return res.status(404).json({
         success: false,
         message: "Pedido no encontrado",
@@ -186,7 +273,7 @@ router.get("/:id", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: pedido,
+      data: order,
     });
   } catch (error) {
     console.error("Error al consultar pedido:", error);
@@ -198,13 +285,94 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// PATCH /api/pedidos/:id/estado
-router.patch("/:id/estado", async (req, res) => {
+// POST /api/orders/:id/assign - Un repartidor toma el pedido { courierId }
+// La asignación atómica la hace el servidor TCP (concurrency-tcp-service) en PostgreSQL.
+router.post("/:id/assign", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { estado } = req.body;
+    const courierId = req.body?.courierId;
 
-    // Validar ID
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "El ID del pedido debe ser un entero positivo",
+      });
+    }
+
+    if (!Number.isSafeInteger(courierId) || courierId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "courierId debe ser un entero positivo",
+      });
+    }
+
+    const order = await prisma.order.findUnique({ where: { id } });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Pedido no encontrado",
+      });
+    }
+
+    if (order.status !== "PENDING") {
+      return res.status(409).json({
+        success: false,
+        message: `El pedido ya no está disponible (estado ${order.status})`,
+      });
+    }
+
+    let respuesta;
+    try {
+      respuesta = await enviarMensajeTcp({
+        tipo: "ASIGNAR_PEDIDO",
+        pedidoId: id,
+        repartidorId: courierId,
+        direccion: order.deliveryAddress,
+      });
+    } catch (error) {
+      console.error("Error al contactar el servidor TCP:", error.message);
+      return res.status(503).json({
+        success: false,
+        message: "El servicio de asignación no está disponible",
+      });
+    }
+
+    if (respuesta.tipo !== "ASIGNACION_OK") {
+      return res.status(409).json({
+        success: false,
+        message: "El pedido ya fue asignado a otro repartidor",
+        motivo: respuesta.motivo,
+      });
+    }
+
+    // Asignado: el pedido pasa a CONFIRMED (solo si seguía PENDING)
+    await prisma.order.updateMany({
+      where: { id, status: "PENDING" },
+      data: { status: "CONFIRMED" },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Pedido asignado correctamente",
+      data: { orderId: id, courierId, status: "CONFIRMED" },
+    });
+  } catch (error) {
+    console.error("Error al asignar pedido:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error interno al asignar el pedido",
+    });
+  }
+});
+
+// PATCH /api/orders/:id/status  (también /estado) { status }
+async function actualizarEstado(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const status = req.body?.status ?? req.body?.estado;
+
     if (!Number.isSafeInteger(id) || id <= 0) {
       return res.status(400).json({
         success: false,
@@ -212,56 +380,39 @@ router.patch("/:id/estado", async (req, res) => {
       });
     }
 
-    // Validar estado
-    const transiciones = {
-      PENDIENTE: ["CONFIRMADO", "CANCELADO"],
-      CONFIRMADO: ["EN_PREPARACION", "CANCELADO"],
-      EN_PREPARACION: ["EN_CAMINO", "CANCELADO"],
-      EN_CAMINO: ["ENTREGADO"],
-      ENTREGADO: [],
-      CANCELADO: [],
-    };
-
-    if (
-      typeof estado !== "string" ||
-      !Object.prototype.hasOwnProperty.call(transiciones, estado)
-    ) {
+    if (typeof status !== "string" || !ESTADOS.includes(status)) {
       return res.status(400).json({
         success: false,
         message: "El estado proporcionado no es válido",
       });
     }
 
-    // Buscar pedido
-    const pedido = await prisma.pedido.findUnique({
-      where: { id },
-    });
+    const order = await prisma.order.findUnique({ where: { id } });
 
-    if (!pedido) {
+    if (!order) {
       return res.status(404).json({
         success: false,
         message: "Pedido no encontrado",
       });
     }
 
-    // Validar transición
-    if (!transiciones[pedido.estado].includes(estado)) {
+    if (!TRANSICIONES[order.status].includes(status)) {
       return res.status(409).json({
         success: false,
-        message: `No se permite cambiar de ${pedido.estado} a ${estado}`,
+        message: `No se permite cambiar de ${order.status} a ${status}`,
       });
     }
 
-    // Actualizar estado
-    const pedidoActualizado = await prisma.pedido.update({
+    const actualizado = await prisma.order.update({
       where: { id },
-      data: { estado },
+      data: { status },
+      include: { items: true },
     });
 
     return res.status(200).json({
       success: true,
       message: "Estado del pedido actualizado correctamente",
-      data: pedidoActualizado,
+      data: actualizado,
     });
   } catch (error) {
     console.error("Error al actualizar estado:", error);
@@ -271,6 +422,9 @@ router.patch("/:id/estado", async (req, res) => {
       message: "Error interno al actualizar el estado del pedido",
     });
   }
-});
+}
+
+router.patch("/:id/status", actualizarEstado);
+router.patch("/:id/estado", actualizarEstado);
 
 export default router;

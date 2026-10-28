@@ -1,51 +1,19 @@
 // =============================================================================
 // ASIGNACIÓN CONCURRENTE DE PEDIDOS - J&D DELIVERY  (BE2-01, BE2-02, BE2-03)
-//
-// Mecanismo: UNA sola sentencia UPDATE atómica en PostgreSQL.
-//
-//   UPDATE "Pedido" SET "repartidorId" = $1, estado = 'ASIGNADO'
-//   WHERE id = $2 AND estado = 'PENDIENTE' AND "repartidorId" IS NULL
-//   RETURNING id, "repartidorId", estado;
-//
-// PostgreSQL bloquea la fila mientras la actualiza: si dos solicitudes llegan a
-// la vez, la segunda espera, vuelve a evaluar el WHERE y ya no encuentra la fila
-// (estado distinto de PENDIENTE) -> 0 filas -> rechazada. Esto protege aunque las
-// solicitudes vengan de procesos o computadoras distintas.
-//   1 fila devuelta  -> asignación exitosa
-//   0 filas devueltas -> el pedido no existe o ya no está disponible
-//
-// Usa la tabla "Pedido" de la base del equipo. La base debe tener el estado
-// ASIGNADO y la columna "repartidorId" (ver README, sección 6).
-// Si los nombres cambian: PEDIDOS_TABLE, PEDIDOS_COL_REPARTIDOR, PEDIDOS_COL_ACTUALIZADO.
 // =============================================================================
 
-const IDENTIFICADOR_VALIDO = /^[a-z_][a-z0-9_]*$/i;
-
-// Entre comillas dobles para respetar mayúsculas ("Pedido", "repartidorId")
-function ident(nombre) {
-    if (!IDENTIFICADOR_VALIDO.test(nombre)) throw new Error(`Identificador SQL inválido: ${nombre}`);
-    return `"${nombre}"`;
-}
-
-// Por defecto, los nombres de la base de datos del equipo (order-service / Prisma)
-const NOMBRES_DEFECTO = { tabla: 'Pedido', repartidor: 'repartidorId', actualizado: 'updatedAt' };
-
-function nombresDesdeEntorno(env = process.env) {
-    return {
-        tabla: env.PEDIDOS_TABLE || NOMBRES_DEFECTO.tabla,
-        repartidor: env.PEDIDOS_COL_REPARTIDOR || NOMBRES_DEFECTO.repartidor,
-        actualizado: env.PEDIDOS_COL_ACTUALIZADO || NOMBRES_DEFECTO.actualizado,
-    };
-}
+// Espacio del bloqueo: evita chocar con otros usos de bloqueos de aplicación
+const ESPACIO_BLOQUEO = 7101;
 
 class PostgresStore {
     // `pool` se puede inyectar (pruebas); si no, se crea desde connectionString
-    constructor({ connectionString, nombres = NOMBRES_DEFECTO, pool } = {}) {
-        this.tabla = ident(nombres.tabla);
-        this.colRepartidor = ident(nombres.repartidor);
-        this.colActualizado = ident(nombres.actualizado);
+    constructor({ connectionString, pool } = {}) {
         if (pool) {
             this.pool = pool;
+            // pg-mem comparte una sola transacción entre todas las conexiones, así que en
+            // las pruebas con pool inyectado se encolan las transacciones. Con PostgreSQL
+            // real (sin pool inyectado) NO se encola: el bloqueo de la base es el que protege.
+            this.encolar = true;
         } else {
             const { Pool } = require('pg');
             // Límites de tiempo: si la base no responde, la solicitud falla en vez de quedarse colgada
@@ -53,52 +21,79 @@ class PostgresStore {
             // Sin este handler, un corte de PostgreSQL con conexiones inactivas tumbaría el proceso
             this.pool.on('error', (err) => console.error('⚠️ Error en el pool de PostgreSQL:', err.message));
         }
+        this.cola = Promise.resolve();
     }
 
     async init() {
         await this.pool.query('SELECT 1');
     }
 
-    async asignar(pedidoId, repartidorId) {
-        const r = await this.pool.query(
-            `UPDATE ${this.tabla}
-                SET ${this.colRepartidor} = $1, estado = 'ASIGNADO', ${this.colActualizado} = now()
-              WHERE id = $2 AND estado = 'PENDIENTE' AND ${this.colRepartidor} IS NULL
-          RETURNING id, ${this.colRepartidor} AS repartidor_id, estado`,
-            [repartidorId, pedidoId]
-        );
-        if (r.rows.length === 1) {
-            const f = r.rows[0];
-            return { asignado: true, pedido: { id: Number(f.id), repartidorId: Number(f.repartidor_id), estado: f.estado } };
-        }
-        // No se pudo asignar: se averigua el motivo solo para informar al cliente
-        const actual = await this.consultar(pedidoId);
-        return { asignado: false, motivo: motivoRechazo(actual) };
+    // `direccion` es obligatoria en deliveries; si el mensaje no la trae se usa un texto fijo
+    asignar(pedidoId, repartidorId, direccion) {
+        if (!this.encolar) return this._asignar(pedidoId, repartidorId, direccion);
+        const turno = this.cola.then(() => this._asignar(pedidoId, repartidorId, direccion));
+        this.cola = turno.catch(() => {});
+        return turno;
     }
 
-    async consultar(pedidoId) {
-        const r = await this.pool.query(
-            `SELECT id, estado, ${this.colRepartidor} AS repartidor_id FROM ${this.tabla} WHERE id = $1`,
-            [pedidoId]
-        );
-        if (!r.rows[0]) return null;
-        const f = r.rows[0];
-        return { id: Number(f.id), estado: f.estado, repartidorId: f.repartidor_id === null ? null : Number(f.repartidor_id) };
-    }
+    async _asignar(pedidoId, repartidorId, direccion) {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('SELECT pg_advisory_xact_lock($1::int, $2::int)', [ESPACIO_BLOQUEO, pedidoId]);
 
-    // Solo para pruebas: deja el pedido en PENDIENTE sin repartidor (lo crea si no existe)
-    async sembrar(pedidoId) {
-        const r = await this.pool.query(
-            `UPDATE ${this.tabla} SET estado = 'PENDIENTE', ${this.colRepartidor} = NULL WHERE id = $1`,
-            [pedidoId]
-        );
-        if (r.rowCount === 0) {
-            await this.pool.query(
-                `INSERT INTO ${this.tabla} (id, "clienteId", descripcion, total, estado)
-                 VALUES ($1, 'cliente-prueba', 'Pedido de prueba', 10, 'PENDIENTE')`,
+            const existente = await client.query(
+                `SELECT status FROM deliveries WHERE "orderId" = $1 AND status <> 'CANCELLED' LIMIT 1`,
                 [pedidoId]
             );
+            if (existente.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return { asignado: false, motivo: 'YA_ASIGNADO' };
+            }
+
+            const r = await client.query(
+                `INSERT INTO deliveries ("orderId", "courierId", "deliveryAddress", status, "assignedAt", "updatedAt")
+                 VALUES ($1, $2, $3, 'ASSIGNED', now(), now())
+                 RETURNING id, "orderId", "courierId", status`,
+                [pedidoId, repartidorId, direccion || 'Sin dirección']
+            );
+            const f = r.rows[0];
+            await client.query(
+                `INSERT INTO delivery_history ("deliveryId", "previousStatus", "newStatus", notes)
+                 VALUES ($1, NULL, 'ASSIGNED', $2)`,
+                [f.id, `Asignado al repartidor ${repartidorId}`]
+            );
+            await client.query('COMMIT');
+            return { asignado: true, pedido: { id: Number(f.orderId), repartidorId: Number(f.courierId), estado: f.status } };
+        } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
+            // Red de seguridad: el índice único sobre "orderId" (23505) también impide la doble asignación
+            if (err.code === '23505') return { asignado: false, motivo: 'YA_ASIGNADO' };
+            throw err;
+        } finally {
+            client.release();
         }
+    }
+
+    // Sin entrega activa el pedido se considera PENDING (aquí no se consulta la tabla de pedidos)
+    async consultar(pedidoId) {
+        const r = await this.pool.query(
+            `SELECT status, "courierId" FROM deliveries
+              WHERE "orderId" = $1 AND status <> 'CANCELLED' ORDER BY id DESC LIMIT 1`,
+            [pedidoId]
+        );
+        if (!r.rows[0]) return { id: pedidoId, estado: 'PENDING', repartidorId: null };
+        const f = r.rows[0];
+        return { id: pedidoId, estado: f.status, repartidorId: f.courierId === null ? null : Number(f.courierId) };
+    }
+
+    // Solo para pruebas: deja el pedido sin entrega (la asignación la crea)
+    async sembrar(pedidoId) {
+        await this.pool.query(
+            `DELETE FROM delivery_history WHERE "deliveryId" IN (SELECT id FROM deliveries WHERE "orderId" = $1)`,
+            [pedidoId]
+        );
+        await this.pool.query(`DELETE FROM deliveries WHERE "orderId" = $1`, [pedidoId]);
     }
 
     async close() {
@@ -106,14 +101,8 @@ class PostgresStore {
     }
 }
 
-function motivoRechazo(pedido) {
-    if (!pedido) return 'NO_ENCONTRADO';
-    if (pedido.repartidorId !== null || pedido.estado === 'ASIGNADO') return 'YA_ASIGNADO';
-    return 'ESTADO_INVALIDO';
-}
-
-function crearStore(databaseUrl, nombres = nombresDesdeEntorno()) {
-    return new PostgresStore({ connectionString: databaseUrl, nombres });
+function crearStore(databaseUrl) {
+    return new PostgresStore({ connectionString: databaseUrl });
 }
 
 module.exports = { crearStore, PostgresStore };

@@ -10,7 +10,7 @@ datasource db {
 model Delivery {
   id              Int               @id @default(autoincrement())
   orderId         Int
-  courierId       Int
+  courierId       Int?
   deliveryAddress String
   status          DeliveryStatus    @default(PENDING)
   assignedAt      DateTime?
@@ -20,6 +20,7 @@ model Delivery {
   updatedAt       DateTime          @updatedAt
   history         DeliveryHistory[]
 
+  @@unique([orderId])
   @@map("deliveries")
 }
 

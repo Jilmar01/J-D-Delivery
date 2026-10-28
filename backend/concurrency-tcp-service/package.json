@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "enviar": "node src/tcp-client.js",
+    "repartidor": "node src/courier-client.js",
     "concurrencia": "node src/concurrencia.js",
     "test": "node --test"
   },

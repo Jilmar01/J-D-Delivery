@@ -4,7 +4,7 @@ import cors from "cors";
 import { prisma } from "../config/database.js";
 
 // Rutas de Endpoints
-import pedidoRoutes from "./routes/pedido.routes.js";
+import orderRoutes from "./routes/order.routes.js";
 
 dotenv.config();
 
@@ -27,7 +27,7 @@ app.get("/", (req, res) => {
 });
 
 // Ruta pedidos
-app.use("/api/pedidos", pedidoRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Endpoint de salud
 app.get("/health", (req, res) => {

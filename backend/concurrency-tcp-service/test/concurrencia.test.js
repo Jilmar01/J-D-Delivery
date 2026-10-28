@@ -4,27 +4,37 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const net = require('node:net');
-const { newDb } = require('pg-mem');
+const { newDb, DataType } = require('pg-mem');
 const { crearServidor } = require('../server');
 const { PostgresStore, crearStore } = require('../src/asignacion');
 const { enviarMensaje } = require('../src/tcp-client');
 
-// Base de Jilmar con los cambios de la sección 6 del README (estado ASIGNADO y "repartidorId").
-// total es NUMERIC porque pg-mem no soporta DECIMAL(10,2), que es lo que usa la base real.
-const baseJilmar = `
-    CREATE TYPE "EstadoPedido" AS ENUM ('PENDIENTE', 'EN_PROCESO', 'COMPLETADO', 'CANCELADO', 'ASIGNADO');
-    CREATE TABLE "Pedido" (
-        "id" SERIAL PRIMARY KEY, "clienteId" TEXT NOT NULL, "descripcion" TEXT,
-        "total" NUMERIC NOT NULL, "estado" "EstadoPedido" NOT NULL DEFAULT 'PENDIENTE',
+// Esquema de delivery_db (delivery-service/prisma/migrations). Los enums se simulan con TEXT
+// porque pg-mem los soporta peor; en PostgreSQL real son enums.
+const baseDelivery = `
+    CREATE TABLE deliveries (
+        "id" SERIAL PRIMARY KEY, "orderId" INTEGER NOT NULL UNIQUE, "courierId" INTEGER,
+        "deliveryAddress" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'PENDING',
+        "assignedAt" TIMESTAMP(3), "startedAt" TIMESTAMP(3), "deliveredAt" TIMESTAMP(3),
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "repartidorId" BIGINT
+        "updatedAt" TIMESTAMP(3) NOT NULL
+    );
+    CREATE TABLE delivery_history (
+        "id" SERIAL PRIMARY KEY, "deliveryId" INTEGER NOT NULL, "previousStatus" TEXT,
+        "newStatus" TEXT NOT NULL, "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "notes" TEXT
     );`;
 
 const almacenes = {
     'postgres (pg-mem)': async () => {
         const db = newDb();
-        db.public.none(baseJilmar);
+        db.public.none(baseDelivery);
+        // pg-mem no trae los bloqueos de aplicación; aquí es un no-op (las transacciones se encolan en el store)
+        db.public.registerFunction({
+            name: 'pg_advisory_xact_lock',
+            args: [DataType.integer, DataType.integer],
+            returns: DataType.integer,
+            implementation: () => 1,
+        });
         const pool = new (db.adapters.createPg().Pool)();
         return new PostgresStore({ pool });
     },
@@ -64,14 +74,21 @@ for (const [nombre, crearAlmacen] of Object.entries(almacenes)) {
 
             // Una sola asignación persistida y coherente con el ganador
             const { pedido } = await enviarMensaje({ tipo: 'CONSULTAR_PEDIDO', pedidoId }, ctx.opts);
-            assert.strictEqual(pedido.estado, 'ASIGNADO');
+            assert.strictEqual(pedido.estado, 'ASSIGNED');
             assert.strictEqual(pedido.repartidorId, ganadores[0].repartidorId);
+
+            // En la base: una sola entrega para el pedido y una sola fila de historial
+            const entregas = await ctx.store.pool.query('SELECT "courierId" FROM deliveries WHERE "orderId" = $1', [pedidoId]);
+            assert.strictEqual(entregas.rows.length, 1);
+            assert.strictEqual(Number(entregas.rows[0].courierId), ganadores[0].repartidorId);
+            const historial = await ctx.store.pool.query('SELECT "newStatus" FROM delivery_history');
+            assert.deepStrictEqual(historial.rows.map((r) => r.newStatus), ['ASSIGNED']);
         } finally {
             await cerrar(ctx);
         }
     });
 
-    test(`[${nombre}] pedidos distintos se asignan en paralelo, y los inexistentes se rechazan`, async () => {
+    test(`[${nombre}] pedidos distintos se asignan en paralelo y cada uno queda con su historial`, async () => {
         const ctx = await levantar(crearAlmacen);
         try {
             for (let i = 0; i < 20; i++) await ctx.store.sembrar(2000 + i);
@@ -80,9 +97,8 @@ for (const [nombre, crearAlmacen] of Object.entries(almacenes)) {
                     enviarMensaje({ tipo: 'ASIGNAR_PEDIDO', pedidoId: 2000 + i, repartidorId: 7 }, ctx.opts))
             );
             assert.ok(respuestas.every((r) => r.tipo === 'ASIGNACION_OK'));
-
-            const noExiste = await enviarMensaje({ tipo: 'ASIGNAR_PEDIDO', pedidoId: 999999, repartidorId: 7 }, ctx.opts);
-            assert.deepStrictEqual(noExiste, { tipo: 'ASIGNACION_RECHAZADA', pedidoId: 999999, motivo: 'NO_ENCONTRADO' });
+            const historial = await ctx.store.pool.query('SELECT count(*) AS n FROM delivery_history');
+            assert.strictEqual(Number(historial.rows[0].n), 20);
         } finally {
             await cerrar(ctx);
         }

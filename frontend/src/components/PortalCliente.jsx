@@ -108,7 +108,9 @@ function PortalCliente({ usuario }) {
   useEffect(() => {
     async function cargarPedidos() {
       try {
-        const datos = await obtenerPedidosCliente(usuario.correo)
+        const datos = await obtenerPedidosCliente(usuario.correo, {
+          demo: usuario.modoDemostracion,
+        })
         setPedidos(datos)
       } catch {
         setError('No se pudieron cargar los pedidos.')
@@ -118,19 +120,26 @@ function PortalCliente({ usuario }) {
     }
 
     cargarPedidos()
-  }, [usuario.correo])
+  }, [usuario.correo, usuario.modoDemostracion])
 
   async function crearPedido(e) {
     e.preventDefault()
     setMensaje('')
     setError('')
 
+    if (!ubicacionConfirmada) {
+      setError('Confirma el punto de entrega en el mapa antes de registrar el pedido.')
+      return
+    }
+
     try {
       const nuevoPedido = await guardarPedido({
         cliente,
         direccion,
         descripcion,
-      }, usuario.correo)
+        lat: ubicacionConfirmada.lat,
+        lng: ubicacionConfirmada.lng,
+      }, usuario.correo, { demo: usuario.modoDemostracion })
 
       setPedidos((anteriores) => [...anteriores, nuevoPedido])
       setCliente(usuario.nombre || '')
@@ -139,8 +148,8 @@ function PortalCliente({ usuario }) {
       setUbicacionPendiente(null)
       setUbicacionConfirmada(null)
       setMensaje('¡Pedido registrado correctamente!')
-    } catch {
-      setError('No se pudo registrar el pedido. Intenta nuevamente.')
+    } catch (err) {
+      setError(err.message || 'No se pudo registrar el pedido. Intenta nuevamente.')
     }
   }
 

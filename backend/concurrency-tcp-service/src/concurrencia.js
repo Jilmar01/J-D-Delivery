@@ -2,12 +2,6 @@
 // CONCURRENCIA: SOLICITUDES SIMULTÁNEAS CONTRA UN SERVIDOR EN EJECUCIÓN  (BE2-04)
 // Lanza N repartidores a la vez sobre el MISMO pedido y comprueba que solo uno gana.
 // Sirve para repetir la prueba desde varias computadoras (TCP_HOST = IP del servidor).
-//
-//   node src/concurrencia.js <pedidoId> [cantidad=10]
-//
-// Con DATABASE_URL definida, el script deja el pedido en PENDIENTE antes de empezar
-// (si no existe lo crea), para poder repetirlo. Sin DATABASE_URL, el pedido
-// debe existir ya en la base y estar PENDIENTE.
 // =============================================================================
 const { enviarMensaje } = require('./tcp-client');
 const { crearStore } = require('./asignacion');
