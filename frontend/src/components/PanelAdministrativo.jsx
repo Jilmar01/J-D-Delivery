@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   cambiarEstadoAdministrativo,
   normalizarEventoPedido,
@@ -6,6 +6,7 @@ import {
   obtenerPaginaPedidosParaVistaPrevia,
   WS_URL,
 } from '../services/pedidosService'
+import { obtenerEntregasPorPedidos } from '../services/entregasService'
 import { colorEstado, etiquetaEstado } from '../utils/estados'
 
 const ESTADOS = [
@@ -27,7 +28,7 @@ const TRANSICIONES = {
 }
 
 const FILTROS = ['TODOS', ...ESTADOS]
-const TAMANO_PAGINA = 10
+const TAMANO_PAGINA = 5
 
 function mostrarTotal(total) {
   const valor = Number(total)
@@ -42,9 +43,35 @@ function mostrarTotal(total) {
   }).format(valor)
 }
 
+function mostrarFechaHora(fecha) {
+  if (!fecha) {
+    return '—'
+  }
+
+  const fechaValida = new Date(fecha)
+  return Number.isNaN(fechaValida.getTime())
+    ? '—'
+    : fechaValida.toLocaleString('es-EC')
+}
+
+function etiquetaEstadoEntrega(estado) {
+  const etiquetas = {
+    PENDING: 'Pendiente',
+    ASSIGNED: 'Asignada',
+    IN_PROGRESS: 'En curso',
+    IN_DELIVERY: 'En camino',
+    DELIVERED: 'Entregada',
+    CANCELLED: 'Cancelada',
+  }
+
+  return etiquetas[String(estado || '').toUpperCase()] || estado || '—'
+}
+
 function PanelAdministrativo({ usuario }) {
   const [pedidos, setPedidos] = useState([])
+  const [entregas, setEntregas] = useState({})
   const [filtro, setFiltro] = useState('TODOS')
+  const [paginaActual, setPaginaActual] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [cargandoMas, setCargandoMas] = useState(false)
   const [totalPedidos, setTotalPedidos] = useState(null)
@@ -55,6 +82,23 @@ function PanelAdministrativo({ usuario }) {
     usuario.demo ? 'demo' : 'conectando'
   )
   const [actualizando, setActualizando] = useState([])
+
+  const cargarEntregas = useCallback(async (listaPedidos) => {
+    const resultados = await obtenerEntregasPorPedidos(
+      listaPedidos,
+      usuario.demo ? undefined : usuario.token
+    )
+
+    setEntregas((anteriores) => {
+      const siguientes = { ...anteriores }
+
+      for (const resultado of resultados) {
+        siguientes[resultado.orderId] = resultado
+      }
+
+      return siguientes
+    })
+  }, [usuario.demo, usuario.token])
 
   useEffect(() => {
     let desmontado = false
@@ -85,6 +129,7 @@ function PanelAdministrativo({ usuario }) {
               : pagina.data.length < pagina.total
           )
           setError('')
+          void cargarEntregas(pagina.data)
         }
       } catch (err) {
         if (!desmontado) {
@@ -157,6 +202,9 @@ function PanelAdministrativo({ usuario }) {
                 )
               : [pedidoActualizado, ...anteriores]
           })
+          if (evento.tipo === 'PEDIDO_CREADO') {
+            void cargarEntregas([pedidoActualizado])
+          }
           setError('')
         } catch (err) {
           setError(
@@ -184,10 +232,11 @@ function PanelAdministrativo({ usuario }) {
       window.clearTimeout(reintento)
       socket?.close()
     }
-  }, [usuario.demo, usuario.token])
+  }, [cargarEntregas, usuario.demo, usuario.token])
 
   async function recargarPedidos() {
     setCargando(true)
+    setPaginaActual(0)
 
     try {
       const pagina = usuario.demo
@@ -206,6 +255,7 @@ function PanelAdministrativo({ usuario }) {
           : pagina.data.length < pagina.total
       )
       setError('')
+      void cargarEntregas(pagina.data)
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los pedidos.')
     } finally {
@@ -215,6 +265,18 @@ function PanelAdministrativo({ usuario }) {
 
   async function cargarMasPedidos() {
     if (cargandoMas) {
+      return
+    }
+
+    const siguientePaginaYaCargada =
+      (paginaActual + 1) * TAMANO_PAGINA < pedidos.length
+
+    if (siguientePaginaYaCargada) {
+      setPaginaActual((pagina) => pagina + 1)
+      return
+    }
+
+    if (!hayMasPedidos) {
       return
     }
 
@@ -239,6 +301,10 @@ function PanelAdministrativo({ usuario }) {
           ...pagina.data.filter((pedido) => !idsExistentes.has(pedido.id)),
         ]
       })
+      void cargarEntregas(pagina.data)
+      if (pagina.data.length > 0) {
+        setPaginaActual((pagina) => pagina + 1)
+      }
       setOffsetSiguiente((offset) => offset + pagina.data.length)
       if (pagina.total !== null) {
         setTotalPedidos(pagina.total)
@@ -294,6 +360,10 @@ function PanelAdministrativo({ usuario }) {
     filtro === 'TODOS'
       ? pedidos
       : pedidos.filter((pedido) => pedido.estado === filtro)
+  const pedidosDeLaPagina = pedidosVisibles.slice(
+    paginaActual * TAMANO_PAGINA,
+    (paginaActual + 1) * TAMANO_PAGINA
+  )
   const pendientes = pedidos.filter((pedido) => pedido.estado === 'PENDIENTE')
   const enProceso = pedidos.filter(
     (pedido) =>
@@ -399,7 +469,10 @@ function PanelAdministrativo({ usuario }) {
               <select
                 aria-label="Filtrar pedidos por estado"
                 value={filtro}
-                onChange={(evento) => setFiltro(evento.target.value)}
+                onChange={(evento) => {
+                  setFiltro(evento.target.value)
+                  setPaginaActual(0)
+                }}
                 className="rounded-lg border border-zinc-700 bg-[#09090B] px-3 py-2 text-sm text-white outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10"
               >
                 {FILTROS.map((estado) => (
@@ -422,7 +495,7 @@ function PanelAdministrativo({ usuario }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left text-sm">
+          <table className="w-full min-w-[1450px] text-left text-sm">
             <thead className="bg-[#111113] text-xs uppercase tracking-wider text-zinc-500">
               <tr>
                 <th scope="col" className="px-5 py-4 sm:px-7">
@@ -438,6 +511,21 @@ function PanelAdministrativo({ usuario }) {
                   Repartidor
                 </th>
                 <th scope="col" className="px-5 py-4">
+                  Estado de entrega
+                </th>
+                <th scope="col" className="px-5 py-4">
+                  Dirección de entrega
+                </th>
+                <th scope="col" className="px-5 py-4">
+                  Hora asignada
+                </th>
+                <th scope="col" className="px-5 py-4">
+                  Hora de recogida
+                </th>
+                <th scope="col" className="px-5 py-4">
+                  Hora de llegada
+                </th>
+                <th scope="col" className="px-5 py-4">
                   Total
                 </th>
                 <th scope="col" className="px-5 py-4 sm:px-7">
@@ -448,21 +536,22 @@ function PanelAdministrativo({ usuario }) {
             <tbody className="divide-y divide-white/5">
               {cargando && pedidos.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-5 py-12 text-center text-zinc-400">
+                  <td colSpan="11" className="px-5 py-12 text-center text-zinc-400">
                     Cargando pedidos…
                   </td>
                 </tr>
-              ) : pedidosVisibles.length === 0 ? (
+              ) : pedidosDeLaPagina.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-5 py-12 text-center text-zinc-400">
+                  <td colSpan="11" className="px-5 py-12 text-center text-zinc-400">
                     {pedidos.length === 0
                       ? 'Todavía no hay pedidos registrados.'
                       : 'No hay pedidos para este estado.'}
                   </td>
                 </tr>
               ) : (
-                pedidosVisibles.map((pedido) => {
+                pedidosDeLaPagina.map((pedido) => {
                   const bloqueado = actualizando.includes(pedido.id)
+                  const entrega = entregas[pedido.id]
 
                   return (
                     <tr key={pedido.id} className="text-zinc-300">
@@ -488,7 +577,51 @@ function PanelAdministrativo({ usuario }) {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-5 py-4">
-                        {pedido.repartidor}
+                        {entrega?.status === 'loaded' && entrega.data.courierId
+                          ? `Repartidor ${entrega.data.courierId}`
+                          : pedido.repartidor}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        {entrega?.status === 'loaded' ? (
+                          <span className="rounded-full bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-300">
+                            {etiquetaEstadoEntrega(entrega.data.status)}
+                          </span>
+                        ) : entrega?.status === 'missing' ? (
+                          <span className="text-xs text-zinc-500">
+                            Sin entrega registrada
+                          </span>
+                        ) : entrega?.status === 'error' ? (
+                          <span className="text-xs text-amber-300">
+                            API no disponible
+                          </span>
+                        ) : (
+                          <span className="text-xs text-zinc-500">
+                            Consultando…
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className="max-w-64 truncate px-5 py-4"
+                        title={entrega?.data?.deliveryAddress || ''}
+                      >
+                        {entrega?.status === 'loaded'
+                          ? entrega.data.deliveryAddress || '—'
+                          : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        {entrega?.status === 'loaded'
+                          ? mostrarFechaHora(entrega.data.assignedAt)
+                          : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        {entrega?.status === 'loaded'
+                          ? mostrarFechaHora(entrega.data.startedAt)
+                          : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        {entrega?.status === 'loaded'
+                          ? mostrarFechaHora(entrega.data.deliveredAt)
+                          : '—'}
                       </td>
                       <td className="whitespace-nowrap px-5 py-4">
                         {mostrarTotal(pedido.total)}
@@ -528,24 +661,49 @@ function PanelAdministrativo({ usuario }) {
         </div>
 
         <div className="border-t border-white/10 px-5 py-3 text-xs text-zinc-500 sm:px-7">
-          Mostrando {pedidosVisibles.length} pedidos cargados
+          Mostrando {pedidosDeLaPagina.length} pedidos en esta página
           {totalPedidos !== null ? ` de ${totalPedidos}` : ''} · Los
           {usuario.demo
             ? ' cambios de estado son solo locales en esta vista previa.'
             : ' cambios de estado se guardan en la API.'}
         </div>
 
-        {hayMasPedidos && (
-          <div className="flex justify-center border-t border-white/10 px-5 py-4">
+        {(paginaActual > 0 ||
+          hayMasPedidos ||
+          (paginaActual + 1) * TAMANO_PAGINA < pedidos.length) && (
+          <nav
+            aria-label="Paginación de pedidos"
+            className="flex items-center justify-center gap-3 border-t border-white/10 px-5 py-4"
+          >
+            <button
+              type="button"
+              onClick={() => setPaginaActual((pagina) => Math.max(0, pagina - 1))}
+              disabled={paginaActual === 0 || cargando || cargandoMas}
+              aria-label="Ver pedidos anteriores"
+              title="Ver pedidos anteriores"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-lg font-semibold text-zinc-200 transition hover:border-purple-500/50 hover:bg-purple-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span aria-hidden="true">&lt;</span>
+            </button>
+            <span className="min-w-20 text-center text-xs text-zinc-400">
+              Página {paginaActual + 1}
+            </span>
             <button
               type="button"
               onClick={cargarMasPedidos}
-              disabled={cargandoMas || cargando}
-              className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-5 py-2.5 text-sm font-semibold text-purple-200 transition hover:border-purple-400/60 hover:bg-purple-500/20 disabled:cursor-wait disabled:opacity-60"
+              disabled={
+                cargandoMas ||
+                cargando ||
+                (!hayMasPedidos &&
+                  (paginaActual + 1) * TAMANO_PAGINA >= pedidos.length)
+              }
+              aria-label="Ver siguientes pedidos"
+              title="Ver siguientes pedidos"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-lg font-semibold text-zinc-200 transition hover:border-purple-500/50 hover:bg-purple-500/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {cargandoMas ? 'Cargando pedidos…' : 'Cargar 10 pedidos más'}
+              <span aria-hidden="true">&gt;</span>
             </button>
-          </div>
+          </nav>
         )}
       </section>
     </main>
