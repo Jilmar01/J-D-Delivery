@@ -1,17 +1,5 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Usuario` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('CUSTOMER', 'DELIVERY_PERSON', 'ADMIN');
-
--- DropTable
-DROP TABLE "Usuario";
-
--- DropEnum
-DROP TYPE "Rol";
 
 -- CreateTable
 CREATE TABLE "users" (

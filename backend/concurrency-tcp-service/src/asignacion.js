@@ -10,9 +10,6 @@ class PostgresStore {
     constructor({ connectionString, pool } = {}) {
         if (pool) {
             this.pool = pool;
-            // pg-mem comparte una sola transacción entre todas las conexiones, así que en
-            // las pruebas con pool inyectado se encolan las transacciones. Con PostgreSQL
-            // real (sin pool inyectado) NO se encola: el bloqueo de la base es el que protege.
             this.encolar = true;
         } else {
             const { Pool } = require('pg');
